@@ -77,7 +77,7 @@
 <div id="filter-bar" class="bg-white sticky top-0 z-20">
   <div class="max-w-6xl mx-auto px-4 py-3 space-y-2">
 
-    <!-- Row 1: Search + Institution + Job Type + Employment -->
+    <!-- Row 1: Search + Institution + Job Type + Location + Posted -->
     <div class="filter-row">
       <!-- Search -->
       <div class="relative flex-1 min-w-48">
@@ -100,16 +100,6 @@
         <option value="Part-Time">Part-Time</option>
       </select>
 
-      <!-- Regular / Temporary -->
-      <select id="f-employment" class="filter-select">
-        <option value="">Regular &amp; Temporary</option>
-        <option value="Regular">Regular</option>
-        <option value="Temporary">Temporary</option>
-      </select>
-    </div>
-
-    <!-- Row 2: Location + Posted + Salary type + Checkboxes + Clear -->
-    <div class="filter-row">
       <!-- Location -->
       <select id="f-location" class="filter-select">
         <option value="">All Locations</option>
@@ -121,13 +111,6 @@
         <option value="7">Last 7 days</option>
         <option value="30">Last 30 days</option>
         <option value="90">Last 90 days</option>
-      </select>
-
-      <!-- Salary type -->
-      <select id="f-salary-type" class="filter-select">
-        <option value="">Any salary type</option>
-        <option value="Hourly">Hourly</option>
-        <option value="Annual">Annual</option>
       </select>
 
       <!-- Has salary checkbox -->
@@ -220,18 +203,6 @@ function typeBadge(type) {
   return `<span class="badge ${cls}">${esc(type)}</span>`;
 }
 
-function employmentBadge(emp) {
-  if (!emp) return '';
-  const cls = emp.toLowerCase().includes('reg') ? 'badge-regular' : 'badge-temp';
-  return `<span class="badge ${cls}">${esc(emp)}</span>`;
-}
-
-function salaryTypeBadge(st) {
-  if (!st) return '';
-  const cls = st === 'Hourly' ? 'badge-hourly' : 'badge-annual';
-  return `<span class="badge ${cls}">${esc(st)}</span>`;
-}
-
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
@@ -289,16 +260,14 @@ function applyFilters() {
   const q          = document.getElementById('search').value.trim().toLowerCase();
   const inst       = document.getElementById('f-institution').value;
   const type       = document.getElementById('f-type').value.toLowerCase();
-  const emp        = document.getElementById('f-employment').value.toLowerCase();
   const loc        = document.getElementById('f-location').value;
   const posted     = parseInt(document.getElementById('f-posted').value) || 0;
-  const salaryType = document.getElementById('f-salary-type').value;
   const salOnly    = document.getElementById('f-salary').checked;
   const remoteOnly = document.getElementById('f-remote').checked;
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || inst || type || emp || loc || posted || salaryType || salOnly || remoteOnly;
+  const hasFilters = q || inst || type || loc || posted || salOnly || remoteOnly;
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
@@ -309,11 +278,6 @@ function applyFilters() {
       if (!ft.includes(type)) return false;
     }
 
-    if (emp) {
-      const rt = (job.employment || '').toLowerCase();
-      if (!rt.includes(emp)) return false;
-    }
-
     if (loc && job.location !== loc) return false;
 
     if (cutoff) {
@@ -321,15 +285,12 @@ function applyFilters() {
       if (!d || d < cutoff) return false;
     }
 
-    if (salaryType && job.salary_type !== salaryType) return false;
-
     if (salOnly && !job.salary) return false;
 
     if (remoteOnly && !job.remote) return false;
 
     if (q) {
       const haystack = `${job.title} ${job.institution} ${job.department} ${job.location}`.toLowerCase();
-      // Support multi-word: every word must appear
       if (!q.split(/\s+/).every(w => haystack.includes(w))) return false;
     }
 
@@ -401,8 +362,6 @@ function renderCard(job) {
 
   const typeBadges = [
     typeBadge(job.type),
-    employmentBadge(job.employment),
-    salaryTypeBadge(job.salary_type),
     remoteHtml,
   ].filter(Boolean).join(' ');
 
@@ -553,7 +512,7 @@ function goPage(p) {
 
 // ── Event listeners ────────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', onSearchInput);
-['f-institution','f-type','f-employment','f-location','f-posted','f-salary-type'].forEach(id => {
+['f-institution','f-type','f-location','f-posted'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); });
 });
 document.getElementById('f-salary').addEventListener('change',  () => { currentPage = 1; applyFilters(); });
@@ -561,7 +520,7 @@ document.getElementById('f-remote').addEventListener('change',  () => { currentP
 
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
-  ['f-institution','f-type','f-employment','f-location','f-posted','f-salary-type'].forEach(id => {
+  ['f-institution','f-type','f-location','f-posted'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('f-salary').checked = false;
