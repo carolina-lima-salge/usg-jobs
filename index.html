@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USG Job Listings</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --navy: #1e3a5f;
+      --navy-light: #2d5490;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .card-expand { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .card-expand.open { max-height: 1000px; }
+    .chevron { transition: transform 0.25s ease; }
+    .chevron.open { transform: rotate(180deg); }
+    #filter-bar { box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .job-card { transition: box-shadow 0.15s ease; }
+    .job-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .badge { display: inline-flex; align-items: center; font-size: 0.7rem;
+             font-weight: 600; padding: 2px 8px; border-radius: 9999px; }
+    /* Source-based institution badge colours */
+    .badge-uga      { background: #fde8e8; color: #9b1c1c; }
+    .badge-gatech   { background: #fef3c7; color: #92400e; }
+    .badge-gastate  { background: #dbeafe; color: #1e40af; }
+    .badge-onehcm   { background: #f3f4f6; color: #374151; }
+    /* Job type badges */
+    .badge-fulltime { background: #d1fae5; color: #065f46; }
+    .badge-parttime { background: #ffedd5; color: #9a3412; }
+    .badge-regular  { background: #e0f2fe; color: #0369a1; }
+    .badge-temp     { background: #fef9c3; color: #854d0e; }
+    /* Pagination */
+    .page-btn { min-width: 36px; height: 36px; display: flex; align-items: center;
+                justify-content: center; border-radius: 6px; font-size: 0.875rem;
+                cursor: pointer; border: 1px solid #d1d5db; background: white;
+                transition: all 0.15s; }
+    .page-btn:hover:not(.active):not(:disabled) { background: #f3f4f6; }
+    .page-btn.active { background: var(--navy); color: white; border-color: var(--navy); }
+    .page-btn:disabled { opacity: 0.4; cursor: default; }
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+  </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen">
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header style="background: var(--navy);" class="text-white">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">USG Job Listings</h1>
+        <p class="mt-1 text-blue-200 text-sm">University System of Georgia &mdash; Open Positions</p>
+      </div>
+      <div id="meta-bar" class="text-blue-300 text-sm text-right">
+        Loading&hellip;
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Filter bar (sticky) ──────────────────────────────────────────────────── -->
+<div id="filter-bar" class="bg-white sticky top-0 z-20">
+  <div class="max-w-6xl mx-auto px-4 py-3">
+    <div class="flex flex-wrap gap-2 items-center">
+
+      <!-- Search -->
+      <div class="relative flex-1 min-w-48">
+        <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input id="search" type="search" placeholder="Search titles, departments&hellip;"
+               class="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+      </div>
+
+      <!-- Institution -->
+      <select id="f-institution" class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+        <option value="">All Institutions</option>
+      </select>
+
+      <!-- Job type -->
+      <select id="f-type" class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+        <option value="">All Job Types</option>
+        <option value="Full-Time">Full-Time</option>
+        <option value="Part-Time">Part-Time</option>
+      </select>
+
+      <!-- Regular / Temporary -->
+      <select id="f-employment" class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+        <option value="">Regular &amp; Temporary</option>
+        <option value="Regular">Regular</option>
+        <option value="Temporary">Temporary</option>
+      </select>
+
+      <!-- Posted within -->
+      <select id="f-posted" class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+        <option value="">Any time</option>
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+
+      <!-- Has salary -->
+      <label class="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer select-none whitespace-nowrap">
+        <input id="f-salary" type="checkbox" class="rounded border-slate-300 text-blue-600" />
+        Has salary
+      </label>
+
+      <!-- Clear + count -->
+      <button id="btn-clear" class="text-sm text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap hidden">
+        Clear filters
+      </button>
+
+      <span id="result-count" class="text-sm text-slate-500 font-medium ml-auto whitespace-nowrap"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Results ──────────────────────────────────────────────────────────────── -->
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+  <!-- Loading state -->
+  <div id="loading" class="text-center py-20 text-slate-400">
+    <svg class="animate-spin mx-auto mb-3 w-8 h-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+    </svg>
+    Loading job listings&hellip;
+  </div>
+
+  <!-- Job cards -->
+  <div id="results" class="space-y-2 hidden"></div>
+
+  <!-- Empty state -->
+  <div id="empty" class="hidden text-center py-20 text-slate-400">
+    <p class="text-lg font-medium">No jobs match your filters</p>
+    <p class="text-sm mt-1">Try adjusting your search or clearing the filters.</p>
+  </div>
+
+  <!-- Pagination -->
+  <div id="pagination" class="mt-8 flex justify-center items-center gap-1.5 flex-wrap"></div>
+
+</main>
+
+<footer class="max-w-6xl mx-auto px-4 pb-8 text-center text-xs text-slate-400">
+  Data scraped from USG institution portals &bull; Refreshed weekly &bull;
+  Always verify details on the <a class="underline hover:text-slate-600" href="https://careers.hprod.onehcm.usg.edu" target="_blank">official USG careers portal</a>
+</footer>
+
+<!-- ── JavaScript ───────────────────────────────────────────────────────────── -->
+<script>
+const PAGE_SIZE = 25;
+let allJobs    = [];
+let filtered   = [];
+let currentPage = 1;
+let expandedId  = null;
+
+// ── Date utilities ─────────────────────────────────────────────────────────────
+function parseDate(s) {
+  if (!s) return null;
+  const d = new Date(s + 'T00:00:00');
+  return isNaN(d) ? null : d;
+}
+
+function fmtDate(s) {
+  const d = parseDate(s);
+  if (!d) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── Badge helpers ──────────────────────────────────────────────────────────────
+function sourceBadgeClass(source) {
+  const s = (source || '').toLowerCase();
+  if (s.includes('uga'))        return 'badge-uga';
+  if (s.includes('tech'))       return 'badge-gatech';
+  if (s.includes('state'))      return 'badge-gastate';
+  return 'badge-onehcm';
+}
+
+function typeBadge(type) {
+  if (!type) return '';
+  const cls = type.toLowerCase().includes('full') ? 'badge-fulltime' : 'badge-parttime';
+  return `<span class="badge ${cls}">${esc(type)}</span>`;
+}
+
+function employmentBadge(emp) {
+  if (!emp) return '';
+  const cls = emp.toLowerCase().includes('reg') ? 'badge-regular' : 'badge-temp';
+  return `<span class="badge ${cls}">${esc(emp)}</span>`;
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Load data ──────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const res = await fetch('jobs.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    allJobs = data.jobs || [];
+
+    // Populate institution dropdown
+    const sel = document.getElementById('f-institution');
+    (data.meta.institutions || []).forEach(inst => {
+      const opt = document.createElement('option');
+      opt.value = inst;
+      opt.textContent = inst;
+      sel.appendChild(opt);
+    });
+
+    // Meta bar
+    document.getElementById('meta-bar').innerHTML =
+      `<span class="font-semibold text-white">${allJobs.length.toLocaleString()}</span>` +
+      ` open positions &bull; Updated ${data.meta.last_updated || 'recently'}`;
+
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('results').classList.remove('hidden');
+
+    applyFilters();
+  } catch(e) {
+    document.getElementById('loading').innerHTML =
+      `<p class="text-red-500">Failed to load jobs data: ${e.message}</p>`;
+  }
+}
+
+// ── Filtering ──────────────────────────────────────────────────────────────────
+let searchTimer = null;
+
+function onSearchInput() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { currentPage = 1; applyFilters(); }, 220);
+}
+
+function applyFilters() {
+  const q        = document.getElementById('search').value.trim().toLowerCase();
+  const inst     = document.getElementById('f-institution').value;
+  const type     = document.getElementById('f-type').value.toLowerCase();
+  const emp      = document.getElementById('f-employment').value.toLowerCase();
+  const posted   = parseInt(document.getElementById('f-posted').value) || 0;
+  const salOnly  = document.getElementById('f-salary').checked;
+  const cutoff   = posted ? new Date(Date.now() - posted * 86400000) : null;
+
+  // Show / hide clear button
+  const hasFilters = q || inst || type || emp || posted || salOnly;
+  document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
+
+  filtered = allJobs.filter(job => {
+    if (inst && job.institution !== inst) return false;
+
+    if (type) {
+      const ft = (job.type || '').toLowerCase();
+      if (!ft.includes(type)) return false;
+    }
+
+    if (emp) {
+      const rt = (job.employment || '').toLowerCase();
+      if (!rt.includes(emp)) return false;
+    }
+
+    if (cutoff) {
+      const d = parseDate(job.posted);
+      if (!d || d < cutoff) return false;
+    }
+
+    if (salOnly && !job.salary) return false;
+
+    if (q) {
+      const haystack = `${job.title} ${job.institution} ${job.department} ${job.location}`.toLowerCase();
+      // Support multi-word: every word must appear
+      if (!q.split(/\s+/).every(w => haystack.includes(w))) return false;
+    }
+
+    return true;
+  });
+
+  currentPage = 1;
+  render();
+}
+
+// ── Render cards ───────────────────────────────────────────────────────────────
+function render() {
+  const total   = filtered.length;
+  const start   = (currentPage - 1) * PAGE_SIZE;
+  const pageJobs = filtered.slice(start, start + PAGE_SIZE);
+
+  // Result count
+  document.getElementById('result-count').textContent =
+    `${total.toLocaleString()} job${total !== 1 ? 's' : ''}`;
+
+  const container = document.getElementById('results');
+  const empty     = document.getElementById('empty');
+
+  if (total === 0) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+  empty.classList.add('hidden');
+
+  container.innerHTML = pageJobs.map(renderCard).join('');
+
+  // Re-attach expand listeners
+  container.querySelectorAll('.job-card').forEach(card => {
+    card.querySelector('.card-header').addEventListener('click', () => {
+      const id = card.dataset.id;
+      toggleExpand(id, card);
+    });
+  });
+
+  renderPagination(total);
+
+  // Restore expanded card if it's on this page
+  if (expandedId) {
+    const card = container.querySelector(`[data-id="${CSS.escape(expandedId)}"]`);
+    if (card) {
+      card.querySelector('.card-expand').classList.add('open');
+      card.querySelector('.chevron').classList.add('open');
+    } else {
+      expandedId = null;
+    }
+  }
+}
+
+function renderCard(job) {
+  const badgeCls  = sourceBadgeClass(job.source);
+  const instLabel = job.institution || 'Unknown';
+  const posted    = job.posted ? `Posted ${fmtDate(job.posted)}` : '';
+  const closes    = job.closes ? ` &bull; Closes ${fmtDate(job.closes)}` : '';
+  const salary    = job.salary
+    ? `<span class="text-emerald-700 font-medium text-xs">💰 ${esc(job.salary)}</span>`
+    : '';
+
+  const typeBadges = [typeBadge(job.type), employmentBadge(job.employment)]
+    .filter(Boolean).join(' ');
+
+  const summary = job.summary
+    ? `<p class="text-slate-600 text-sm leading-relaxed">${esc(job.summary)}</p>`
+    : '<p class="text-slate-400 text-sm italic">No summary available — view full posting for details.</p>';
+
+  const applyHref = esc(job.apply || '#');
+
+  return `
+<div class="job-card bg-white rounded-xl border border-slate-200 overflow-hidden" data-id="${esc(job.id)}">
+  <!-- Clickable header -->
+  <div class="card-header px-5 py-4 cursor-pointer select-none">
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <!-- Title row -->
+        <div class="flex flex-wrap items-center gap-2 mb-1">
+          <h2 class="font-semibold text-slate-900 text-base leading-snug">${esc(job.title || 'Untitled Position')}</h2>
+        </div>
+        <!-- Institution + type badges -->
+        <div class="flex flex-wrap items-center gap-1.5 mb-2">
+          <span class="badge ${badgeCls}">${esc(instLabel)}</span>
+          ${typeBadges}
+          ${salary}
+        </div>
+        <!-- Meta row -->
+        <div class="text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-0.5">
+          ${job.department ? `<span>📁 ${esc(job.department)}</span>` : ''}
+          ${job.location   ? `<span>📍 ${esc(job.location)}</span>`   : ''}
+          ${posted         ? `<span>${posted}${closes}</span>`         : ''}
+        </div>
+      </div>
+      <!-- Chevron -->
+      <svg class="chevron flex-shrink-0 w-5 h-5 text-slate-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </div>
+  </div>
+  <!-- Expandable detail -->
+  <div class="card-expand">
+    <div class="border-t border-slate-100 px-5 py-4 bg-slate-50 space-y-3">
+      ${summary}
+      <div class="flex gap-3 pt-1">
+        <a href="${applyHref}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white"
+           style="background: var(--navy);">
+          View &amp; Apply
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+function toggleExpand(id, card) {
+  const expand  = card.querySelector('.card-expand');
+  const chevron = card.querySelector('.chevron');
+  const isOpen  = expand.classList.contains('open');
+
+  // Collapse current
+  if (expandedId) {
+    const prev = document.querySelector(`[data-id="${CSS.escape(expandedId)}"]`);
+    if (prev) {
+      prev.querySelector('.card-expand').classList.remove('open');
+      prev.querySelector('.chevron').classList.remove('open');
+    }
+  }
+
+  if (isOpen || expandedId === id) {
+    expandedId = null;
+    return;
+  }
+
+  expand.classList.add('open');
+  chevron.classList.add('open');
+  expandedId = id;
+  // Smooth scroll into view if partly off-screen
+  setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+}
+
+// ── Pagination ─────────────────────────────────────────────────────────────────
+function renderPagination(total) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const bar   = document.getElementById('pagination');
+  if (pages <= 1) { bar.innerHTML = ''; return; }
+
+  let html = '';
+  const prev = currentPage - 1;
+  const next = currentPage + 1;
+
+  html += `<button class="page-btn" onclick="goPage(${prev})" ${currentPage===1?'disabled':''}>‹</button>`;
+
+  // Show up to 7 page buttons with ellipsis
+  const visible = pageRange(currentPage, pages);
+  let lastShown = 0;
+  visible.forEach(p => {
+    if (p - lastShown > 1) html += `<span class="page-btn" style="cursor:default;border:none">…</span>`;
+    html += `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+    lastShown = p;
+  });
+
+  html += `<button class="page-btn" onclick="goPage(${next})" ${currentPage===pages?'disabled':''}>›</button>`;
+  bar.innerHTML = html;
+}
+
+function pageRange(current, total) {
+  if (total <= 7) return Array.from({length: total}, (_, i) => i + 1);
+  const delta = 2;
+  const range = new Set([1, total]);
+  for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) range.add(i);
+  return [...range].sort((a,b) => a-b);
+}
+
+function goPage(p) {
+  const pages = Math.ceil(filtered.length / PAGE_SIZE);
+  if (p < 1 || p > pages) return;
+  currentPage = p;
+  expandedId = null;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Event listeners ────────────────────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', onSearchInput);
+['f-institution','f-type','f-employment','f-posted'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); });
+});
+document.getElementById('f-salary').addEventListener('change', () => { currentPage = 1; applyFilters(); });
+document.getElementById('btn-clear').addEventListener('click', () => {
+  document.getElementById('search').value = '';
+  ['f-institution','f-type','f-employment','f-posted'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-salary').checked = false;
+  currentPage = 1;
+  applyFilters();
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
