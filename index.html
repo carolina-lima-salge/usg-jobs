@@ -102,10 +102,9 @@
       background: var(--navy); color: white; border: none; border-radius: 50px;
       padding: 12px 20px; font-size: 0.9rem; font-weight: 600;
       cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-      display: none; align-items: center; gap: 8px;   /* hidden until CV loaded */
+      display: flex; align-items: center; gap: 8px;
       transition: transform 0.15s, box-shadow 0.15s;
     }
-    #coach-btn.visible { display: flex; }
     #coach-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
     #coach-panel {
       position: fixed; bottom: 90px; right: 28px; z-index: 200;
@@ -1206,7 +1205,10 @@ async function parseAndMatchCV(file) {
     else                     text = new TextDecoder().decode(ab);
 
     if (text.trim().length < 20) throw new Error('Could not read text from this file.');
-    cvTextGlobal = text;  // store for CV Coach
+    cvTextGlobal = text;
+    // Reset coach so it re-initialises with the new CV context
+    coachHistory = []; coachReady = false;
+    document.getElementById('coach-messages').innerHTML = '';
 
     // Route: Claude AI (via Worker) > semantic embeddings > TF-IDF keyword fallback
     let method;
@@ -1233,7 +1235,7 @@ async function parseAndMatchCV(file) {
     document.getElementById('btn-cv-toggle').textContent = '🎯 CV loaded';
     document.getElementById('btn-cv-toggle').classList.add('bg-blue-600','text-white','border-blue-600');
     document.getElementById('btn-cv-toggle').classList.remove('bg-blue-50','text-blue-700','border-blue-300');
-    document.getElementById('coach-btn').classList.add('visible');  // show CV Coach
+    // coach button already visible always
 
   } catch (err) {
     document.getElementById('cv-analyzing').classList.add('hidden');
@@ -1251,7 +1253,6 @@ function clearCVMatch() {
   coachReady   = false;
   coachOpen    = false;
   matchMode    = false;
-  document.getElementById('coach-btn').classList.remove('visible');
   document.getElementById('coach-panel').classList.remove('open', 'minimized');
   currentPage = 1;
   document.getElementById('cv-match-bar').classList.add('hidden');
@@ -1416,9 +1417,16 @@ Guidelines:
 
 async function initCoach() {
   coachReady = true;
-  const typing = coachAddBubble('Analysing your CV and top matches…', 'claude', true);
   document.getElementById('coach-send').disabled = true;
 
+  // No CV uploaded yet — just greet and prompt
+  if (!cvTextGlobal) {
+    coachAddBubble('Hi! 👋 Upload your CV using the "🎯 Match my CV" button above and I\'ll analyse it against the job listings to give you personalised tips to strengthen your application.', 'claude', false);
+    document.getElementById('coach-send').disabled = false;
+    return;
+  }
+
+  const typing = coachAddBubble('Analysing your CV and top matches…', 'claude', true);
   const systemPrompt = coachBuildSystemPrompt();
   const initMsg = 'Please give me your top 3 most impactful, specific recommendations to improve my CV for the jobs I matched with.';
 
