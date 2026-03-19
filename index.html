@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>USG Job Listings</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <style>
     :root {
       --navy: #1e3a5f;
@@ -94,6 +96,28 @@
       background: none; border: none; padding: 0;
     }
     .ms-clear-btn:hover { text-decoration: underline; }
+    /* CV match panel */
+    #cv-panel { background: #f0f7ff; border-top: 2px solid #bfdbfe; }
+    .cv-dropzone {
+      border: 2px dashed #93c5fd; border-radius: 12px; background: white;
+      padding: 28px 20px; text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .cv-dropzone.drag-over { border-color: #1e3a5f; background: #eff6ff; }
+    .cv-dropzone.loaded { border-style: solid; border-color: #86efac; background: #f0fdf4; cursor: default; }
+    .cv-browse-label {
+      color: #2563eb; font-weight: 600; cursor: pointer; text-decoration: underline;
+    }
+    .cv-browse-label:hover { color: #1d4ed8; }
+    /* Match score badges */
+    .match-high { background: #d1fae5; color: #065f46; }
+    .match-med  { background: #fef3c7; color: #92400e; }
+    .match-low  { background: #f1f5f9; color: #64748b; }
+    /* Match mode sort indicator */
+    #cv-match-bar {
+      background: #1e3a5f; color: white; font-size: 0.78rem;
+      padding: 5px 14px; display: flex; align-items: center; gap: 8px;
+    }
   </style>
 </head>
 
@@ -191,6 +215,12 @@
         Remote only
       </label>
 
+      <!-- CV Match button -->
+      <button id="btn-cv-toggle" type="button"
+        class="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 whitespace-nowrap transition-colors">
+        🎯 Match my CV
+      </button>
+
       <!-- Clear + count -->
       <button id="btn-clear" class="text-sm text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap hidden">
         Clear filters
@@ -199,6 +229,46 @@
       <span id="result-count" class="text-sm text-slate-500 font-medium ml-auto whitespace-nowrap"></span>
     </div>
 
+  </div>
+</div>
+
+<!-- ── CV Match Panel ───────────────────────────────────────────────────────── -->
+<div id="cv-panel" class="hidden sticky top-[57px] z-10">
+  <div class="max-w-6xl mx-auto px-4 py-4">
+    <!-- Idle: drop zone -->
+    <div id="cv-idle-zone">
+      <div class="cv-dropzone" id="cv-dropzone">
+        <svg class="mx-auto mb-2 w-10 h-10 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <p class="text-slate-700 font-medium">Drop your CV here or
+          <label for="cv-file-input" class="cv-browse-label">browse</label>
+        </p>
+        <p class="text-slate-400 text-xs mt-1">Accepts PDF, DOCX, or TXT &mdash; processed entirely in your browser</p>
+        <input type="file" id="cv-file-input" accept=".pdf,.docx,.txt" class="hidden">
+      </div>
+    </div>
+    <!-- Analyzing state -->
+    <div id="cv-analyzing" class="hidden text-center py-5 text-blue-700 font-medium">
+      <svg class="animate-spin inline w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+      </svg>
+      Analyzing CV&hellip;
+    </div>
+    <!-- Error state -->
+    <div id="cv-error" class="hidden text-center py-3 text-red-600 text-sm font-medium"></div>
+  </div>
+</div>
+
+<!-- Match mode indicator bar -->
+<div id="cv-match-bar" class="hidden sticky top-[57px] z-10">
+  <div class="max-w-6xl mx-auto px-4 flex items-center justify-between gap-4">
+    <span>🎯 Jobs ranked by match with <strong id="cv-filename-label"></strong></span>
+    <button id="btn-cv-remove" type="button" class="text-blue-200 hover:text-white text-xs underline whitespace-nowrap">
+      Remove CV &times;
+    </button>
   </div>
 </div>
 
@@ -448,8 +518,10 @@ function applyFilters() {
     return true;
   });
 
-  // Sort
-  if (sort === 'salary-desc') {
+  // Sort — CV match overrides all other sorts when active
+  if (matchMode) {
+    filtered.sort((a, b) => (cvScores[b.id] || 0) - (cvScores[a.id] || 0));
+  } else if (sort === 'salary-desc') {
     filtered.sort((a, b) => {
       const na = parseSalaryNum(a.salary), nb = parseSalaryNum(b.salary);
       if (na === -1 && nb === -1) return 0;
@@ -531,9 +603,12 @@ function renderCard(job) {
     ? `<span class="badge" style="background:#f0fdf4;color:#166534;">🏠 Remote</span>`
     : '';
 
+  const cvMatchHtml = matchMode && cvScores[job.id] != null ? matchBadge(cvScores[job.id]) : '';
+
   const typeBadges = [
     typeBadge(job.type),
     remoteHtml,
+    cvMatchHtml,
   ].filter(Boolean).join(' ');
 
   const summary = job.summary
@@ -714,6 +789,191 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 
   currentPage = 1;
   applyFilters();
+});
+
+// ── CV Matching ─────────────────────────────────────────────────────────────────
+let cvScores  = {};     // jobId → normalised score 0‥1
+let matchMode = false;
+let idfCache  = null;
+
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+}
+
+const STOPWORDS = new Set([
+  'a','an','the','and','or','but','in','on','at','to','for','of','with','by',
+  'from','as','is','was','are','were','be','been','being','have','has','had',
+  'do','does','did','will','would','could','should','may','might','shall','can',
+  'this','that','these','those','it','its','they','their','we','our','you','your',
+  'i','my','he','she','him','her','his','us','them','who','which','what','when',
+  'where','why','how','all','any','each','few','more','most','other','some','such',
+  'no','nor','not','only','own','same','so','than','too','very','just','about',
+  'also','both','during','even','into','many','now','over','since','still','then',
+  'through','until','up','use','used','using','via','well','while','yet','per',
+  'new','good','great','work','works','working','get','gets','one','two','three',
+]);
+
+function tokenize(text) {
+  return (text || '').toLowerCase()
+    .replace(/[^a-z0-9+#.\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOPWORDS.has(w));
+}
+
+function buildIDF() {
+  if (idfCache) return idfCache;
+  const docFreq = {};
+  const N = allJobs.length;
+  allJobs.forEach(job => {
+    const toks = new Set(tokenize(`${job.title} ${job.department||''} ${job.summary||''}`));
+    toks.forEach(t => { docFreq[t] = (docFreq[t] || 0) + 1; });
+  });
+  idfCache = {};
+  Object.keys(docFreq).forEach(t => {
+    idfCache[t] = Math.log((N + 1) / (docFreq[t] + 1)) + 1; // smoothed IDF
+  });
+  return idfCache;
+}
+
+function scoreJob(job, cvFreq, idf) {
+  const titleToks   = tokenize(job.title || '');
+  const deptToks    = tokenize(job.department || '');
+  const summaryToks = tokenize(job.summary || '');
+  let score = 0;
+  for (const [term, freq] of Object.entries(cvFreq)) {
+    const termIDF = idf[term] || 0;
+    if (!termIDF) continue;
+    const w = (titleToks.includes(term) ? 4 : 0) ||
+              (deptToks.includes(term)  ? 2 : 0) ||
+              (summaryToks.includes(term) ? 1 : 0);
+    if (w) score += Math.sqrt(freq) * termIDF * w;
+  }
+  return score;
+}
+
+function runCVMatching(cvText) {
+  const idf   = buildIDF();
+  const toks  = tokenize(cvText);
+  const freq  = {};
+  toks.forEach(t => { freq[t] = (freq[t] || 0) + 1; });
+
+  const raw = {};
+  allJobs.forEach(job => { raw[job.id] = scoreJob(job, freq, idf); });
+
+  const maxScore = Math.max(...Object.values(raw), 1);
+  cvScores = {};
+  allJobs.forEach(job => { cvScores[job.id] = raw[job.id] / maxScore; });
+
+  matchMode = true;
+  currentPage = 1;
+  applyFilters();
+}
+
+function matchBadge(score) {
+  const pct = Math.round(score * 100);
+  if (pct < 5) return '';
+  const cls   = pct >= 55 ? 'match-high' : pct >= 25 ? 'match-med' : 'match-low';
+  const label = pct >= 55 ? `⭐ ${pct}% match` : `${pct}% match`;
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+// ── File parsing ────────────────────────────────────────────────────────────────
+async function extractPDFText(ab) {
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(ab) }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page    = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(s => s.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+async function extractDOCXText(ab) {
+  const result = await mammoth.extractRawText({ arrayBuffer: ab });
+  return result.value;
+}
+
+async function parseAndMatchCV(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  document.getElementById('cv-idle-zone').classList.add('hidden');
+  document.getElementById('cv-analyzing').classList.remove('hidden');
+  document.getElementById('cv-error').classList.add('hidden');
+
+  try {
+    const ab = await file.arrayBuffer();
+    let text = '';
+    if (ext === 'pdf')       text = await extractPDFText(ab);
+    else if (ext === 'docx') text = await extractDOCXText(ab);
+    else                     text = new TextDecoder().decode(ab);
+
+    if (text.trim().length < 20) throw new Error('Could not read text from this file.');
+
+    runCVMatching(text);
+
+    // Show match bar, hide panel
+    document.getElementById('cv-filename-label').textContent = file.name;
+    document.getElementById('cv-panel').classList.add('hidden');
+    document.getElementById('cv-match-bar').classList.remove('hidden');
+    document.getElementById('btn-cv-toggle').textContent = '🎯 CV loaded';
+    document.getElementById('btn-cv-toggle').classList.add('bg-blue-600','text-white','border-blue-600');
+    document.getElementById('btn-cv-toggle').classList.remove('bg-blue-50','text-blue-700','border-blue-300');
+
+  } catch (err) {
+    document.getElementById('cv-analyzing').classList.add('hidden');
+    document.getElementById('cv-idle-zone').classList.remove('hidden');
+    document.getElementById('cv-error').textContent = `⚠ ${err.message}`;
+    document.getElementById('cv-error').classList.remove('hidden');
+  }
+}
+
+function clearCVMatch() {
+  cvScores  = {};
+  matchMode = false;
+  currentPage = 1;
+  document.getElementById('cv-match-bar').classList.add('hidden');
+  document.getElementById('cv-panel').classList.add('hidden');
+  document.getElementById('cv-analyzing').classList.add('hidden');
+  document.getElementById('cv-idle-zone').classList.remove('hidden');
+  document.getElementById('cv-error').classList.add('hidden');
+  document.getElementById('cv-file-input').value = '';
+  const btn = document.getElementById('btn-cv-toggle');
+  btn.textContent = '🎯 Match my CV';
+  btn.classList.remove('bg-blue-600','text-white','border-blue-600');
+  btn.classList.add('bg-blue-50','text-blue-700','border-blue-300');
+  applyFilters();
+}
+
+// ── CV UI events ────────────────────────────────────────────────────────────────
+document.getElementById('btn-cv-toggle').addEventListener('click', () => {
+  if (matchMode) return; // already loaded — do nothing (remove is via × button)
+  const panel = document.getElementById('cv-panel');
+  panel.classList.toggle('hidden');
+});
+
+document.getElementById('btn-cv-remove').addEventListener('click', clearCVMatch);
+
+document.getElementById('cv-file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) parseAndMatchCV(file);
+});
+
+// Drag & drop
+const dz = document.getElementById('cv-dropzone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) parseAndMatchCV(file);
+});
+// Click on dropzone opens file picker (but not on the label itself)
+dz.addEventListener('click', e => {
+  if (e.target.tagName !== 'LABEL' && e.target.tagName !== 'INPUT') {
+    document.getElementById('cv-file-input').click();
+  }
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────────
