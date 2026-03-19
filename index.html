@@ -249,6 +249,17 @@
         <p id="cv-semantic-hint" class="hidden text-emerald-700 text-xs mt-1 font-medium">✨ Semantic matching active — understands meaning, not just keywords</p>
         <input type="file" id="cv-file-input" accept=".pdf,.docx,.txt" class="hidden">
       </div>
+      <!-- Optional AI key -->
+      <div class="mt-3 pt-3 border-t border-blue-100">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs text-slate-500 whitespace-nowrap">🤖 Optional: Anthropic API key for Claude AI matching</span>
+          <input id="cv-api-key" type="password" placeholder="sk-ant-api03-…"
+            class="flex-1 min-w-[200px] border border-blue-200 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-700 focus:outline-none focus:border-blue-400"
+            autocomplete="off" spellcheck="false">
+          <span id="cv-api-key-status" class="text-xs text-slate-400"></span>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">Key stays in browser memory only — never stored or sent anywhere except Anthropic's API. Claude reads your CV and the top job matches to provide smarter scores and explanations.</p>
+      </div>
     </div>
     <!-- Analyzing state -->
     <div id="cv-analyzing" class="hidden text-center py-5 text-blue-700 font-medium">
@@ -607,7 +618,7 @@ function renderCard(job) {
     ? `<span class="badge" style="background:#f0fdf4;color:#166534;">🏠 Remote</span>`
     : '';
 
-  const cvMatchHtml = matchMode && cvScores[job.id] != null ? matchBadge(cvScores[job.id]) : '';
+  const cvMatchHtml = matchMode && cvScores[job.id] != null ? matchBadge(cvScores[job.id], cvReasons[job.id]) : '';
 
   const typeBadges = [
     typeBadge(job.type),
@@ -797,7 +808,9 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 
 // ── CV Matching ─────────────────────────────────────────────────────────────────
 let cvScores  = {};     // jobId → normalised score 0‥1
+let cvReasons = {};     // jobId → one-sentence explanation (from Claude AI)
 let matchMode = false;
+let anthropicApiKey = '';  // optional — held in memory only, never persisted
 
 // ── Semantic matching (primary) ─────────────────────────────────────────────────
 const EMB_DIM       = 384;          // all-MiniLM-L6-v2 output dimension
@@ -874,24 +887,29 @@ function detectCVLevel(cvText) {
   return level;
 }
 
-// Returns 0 (student), 1 (intern/entry), 2 (mid), 3 (senior/exec)
+// Returns 0 (student), 1 (intern/entry), 2 (mid), 3 (senior/faculty/exec)
 function detectJobLevel(job) {
-  const t = `${job.title || ''} ${job.summary || ''}`.toLowerCase();
-  if (/\bstudent (worker|ambassador|assistant|aide|employee|scholar)\b|\bwork[- ]?study\b|\bgraduate (assistant|student)\b|\bundergrad(uate)?\b/.test(t)) return 0;
+  const title = (job.title || '').toLowerCase();
+  const t = `${title} ${(job.summary || '').toLowerCase()}`;
+  // Student / work-study jobs — explicit check on title
+  if (/\bstudent\b/.test(title)) return 0;
+  if (/\bstudent (worker|ambassador|assistant|aide|employee|scholar)\b|\bwork[- ]?study\b|\bgraduate (assistant|student)\b/.test(t)) return 0;
+  // Entry / intern
   if (/\bintern(ship)?\b|\bentry[- ]?level\b|\bjunior\b/.test(t)) return 1;
-  if (/\bdirector\b|\bvp\b|\bvice president\b|\bchief\b|\bdean\b|\bfull professor\b|\bassociate professor\b/.test(t)) return 3;
-  // Also check the title alone for plain "student" (catches "Student Ambassador" etc.)
-  if (/\bstudent\b/.test((job.title || '').toLowerCase())) return 0;
+  // Senior / faculty — any professor rank is senior
+  if (/\bprofessor\b|\bdirector\b|\bvp\b|\bvice president\b|\bchief\b|\bdean\b/.test(t)) return 3;
   return 2;
 }
 
-// Penalty multiplier when CV seniority significantly exceeds job level
+// Penalty only when a senior CV is matched against a student/entry job.
+// Never penalise upward mismatch (let semantics handle that naturally).
 function seniorityPenalty(cvLevel, jobLevel) {
+  if (jobLevel >= 2) return 1.0;           // professional job — no penalty ever
+  if (cvLevel < 2)  return 1.0;           // not a senior CV — no penalty
   const diff = cvLevel - jobLevel;
-  if (diff >= 3) return 0.20;  // PhD/Director → Student job
-  if (diff >= 2) return 0.45;  // Senior → Entry/Intern
-  if (diff >= 1) return 0.75;  // Mid-level → Student/Entry
-  return 1.0;
+  if (diff >= 3) return 0.20;             // PhD/Director → Student job
+  if (diff >= 2) return 0.45;             // Senior → Entry/Intern
+  return 0.75;
 }
 
 async function runSemanticMatching(cvText) {
@@ -995,12 +1013,14 @@ function updateCVStatus(msg) {
   if (el) el.textContent = msg;
 }
 
-function matchBadge(score) {
+function matchBadge(score, reason) {
   const pct = Math.round(score * 100);
   if (pct < 5) return '';
   const cls   = pct >= 60 ? 'match-high' : pct >= 30 ? 'match-med' : 'match-low';
-  const label = pct >= 60 ? `⭐ ${pct}% match` : `${pct}% match`;
-  return `<span class="badge ${cls}">${label}</span>`;
+  const star  = pct >= 60 ? '⭐ ' : '';
+  const label = `${star}${pct}% match`;
+  const tip   = reason ? ` title="${reason.replace(/"/g, '&quot;')}"` : '';
+  return `<span class="badge ${cls}"${tip} style="${reason ? 'cursor:help' : ''}">${label}</span>`;
 }
 
 // ── File parsing ────────────────────────────────────────────────────────────────
@@ -1020,6 +1040,114 @@ async function extractDOCXText(ab) {
   return result.value;
 }
 
+// ── Claude AI matching ──────────────────────────────────────────────────────────
+async function runLLMMatching(cvText) {
+  const cvLevel = detectCVLevel(cvText);
+
+  // Step 1 — pre-rank with semantic or TF-IDF to select top candidates for Claude
+  updateCVStatus('Pre-ranking jobs…');
+  const preScores = {};
+  if (embLoaded) {
+    const cvEmb = await getCVEmbedding(cvText);
+    allJobs.forEach(job => {
+      const idx = jobEmbMeta[job.id];
+      if (idx == null) { preScores[job.id] = 0; return; }
+      const jobEmb = jobEmbeddings.subarray(idx * EMB_DIM, (idx + 1) * EMB_DIM);
+      preScores[job.id] = cosine(cvEmb, jobEmb);
+    });
+  } else {
+    const idf = buildIDF(), freq = {};
+    tokenize(cvText).forEach(t => { freq[t] = (freq[t] || 0) + 1; });
+    allJobs.forEach(job => {
+      const tt = tokenize(job.title || ''), dt = tokenize(job.department || ''), st = tokenize(job.summary || '');
+      let s = 0;
+      for (const [term, f] of Object.entries(freq)) {
+        const termIDF = idf[term] || 0; if (!termIDF) continue;
+        const w = tt.includes(term) ? 4 : dt.includes(term) ? 2 : st.includes(term) ? 1 : 0;
+        if (w) s += Math.sqrt(f) * termIDF * w;
+      }
+      preScores[job.id] = s;
+    });
+  }
+
+  // Step 2 — set baseline calibrated scores for ALL jobs (AI will override top 25)
+  const LOW = 0.10, HIGH = 0.65;
+  cvScores = {};
+  cvReasons = {};
+  const isEmbedding = embLoaded;
+  const preMax = Math.max(...Object.values(preScores), 1);
+  allJobs.forEach(job => {
+    const raw = isEmbedding
+      ? Math.max(0, Math.min(1, (preScores[job.id] - LOW) / (HIGH - LOW)))
+      : preScores[job.id] / preMax;
+    cvScores[job.id] = raw * seniorityPenalty(cvLevel, detectJobLevel(job));
+  });
+
+  // Step 3 — pick top 25 candidates to send to Claude
+  const top25 = allJobs.slice()
+    .sort((a, b) => (preScores[b.id] || 0) - (preScores[a.id] || 0))
+    .slice(0, 25);
+
+  // Step 4 — call Claude claude-haiku-4-5
+  updateCVStatus('Asking Claude to analyse matches…');
+  const cvExcerpt = cvText.substring(0, 3500);
+  const jobsList  = top25.map(job =>
+    `ID:${job.id} | ${job.title} | ${job.institution}\n${(job.summary || '').substring(0, 400)}`
+  ).join('\n\n---\n\n');
+
+  const userMessage = `You are an expert recruiter and career advisor. Carefully read the candidate's CV and rate how well they match each job listing on a 0–100 scale, where 100 is a perfect fit and 0 is completely unrelated.
+
+Consider: field alignment, required qualifications, seniority level, skills, and experience. Be realistic — only give 80+ to genuinely strong matches. A typical good match is 50–70.
+
+Return ONLY a valid JSON array with one object per job, in this exact format (no markdown, no explanation outside the JSON):
+[{"id": "EXACT_JOB_ID", "score": 75, "reason": "One sentence explaining the match or mismatch."}, ...]
+
+CANDIDATE CV:
+${cvExcerpt}
+
+JOBS TO EVALUATE:
+${jobsList}`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': anthropicApiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 3000,
+      messages: [{ role: 'user', content: userMessage }]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Anthropic API error ${resp.status}`);
+  }
+
+  const data    = await resp.json();
+  const rawText = data.content[0].text.trim();
+
+  // Extract JSON array even if Claude wraps it in markdown code fences
+  const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error('Could not parse Claude\'s response as JSON.');
+  const results = JSON.parse(jsonMatch[0]);
+
+  // Step 5 — apply Claude's scores to the top 25 (override baseline)
+  results.forEach(r => {
+    const id = String(r.id);
+    if (r.score != null) cvScores[id] = Math.max(0, Math.min(100, r.score)) / 100;
+    if (r.reason)        cvReasons[id] = r.reason;
+  });
+
+  matchMode   = true;
+  currentPage = 1;
+  applyFilters();
+}
+
 async function parseAndMatchCV(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   document.getElementById('cv-idle-zone').classList.add('hidden');
@@ -1035,16 +1163,22 @@ async function parseAndMatchCV(file) {
 
     if (text.trim().length < 20) throw new Error('Could not read text from this file.');
 
-    // Route to semantic or TF-IDF depending on whether embeddings are loaded
-    if (embLoaded) {
+    // Route: Claude AI > semantic embeddings > TF-IDF keyword fallback
+    let method;
+    if (anthropicApiKey) {
+      await runLLMMatching(text);
+      method = '🤖 Claude AI';
+    } else if (embLoaded) {
       await runSemanticMatching(text);
+      method = 'semantic';
     } else {
       updateCVStatus('Running keyword match (TF-IDF)…');
       runTFIDFMatching(text);
+      method = 'keyword';
     }
 
     // Show match bar, hide panel
-    document.getElementById('cv-match-method').textContent = embLoaded ? 'semantic' : 'keyword';
+    document.getElementById('cv-match-method').textContent = method;
     document.getElementById('cv-filename-label').textContent = file.name;
     document.getElementById('cv-panel').classList.add('hidden');
     document.getElementById('cv-match-bar').classList.remove('hidden');
@@ -1062,6 +1196,7 @@ async function parseAndMatchCV(file) {
 
 function clearCVMatch() {
   cvScores  = {};
+  cvReasons = {};
   matchMode = false;
   currentPage = 1;
   document.getElementById('cv-match-bar').classList.add('hidden');
@@ -1085,6 +1220,24 @@ document.getElementById('btn-cv-toggle').addEventListener('click', () => {
 });
 
 document.getElementById('btn-cv-remove').addEventListener('click', clearCVMatch);
+
+// API key input — validate format and store in memory
+document.getElementById('cv-api-key').addEventListener('input', e => {
+  const val    = e.target.value.trim();
+  const status = document.getElementById('cv-api-key-status');
+  if (!val) {
+    anthropicApiKey = '';
+    status.textContent = '';
+  } else if (val.startsWith('sk-ant-')) {
+    anthropicApiKey = val;
+    status.textContent = '✓ ready';
+    status.className   = 'text-xs text-emerald-600 font-medium';
+  } else {
+    anthropicApiKey = '';
+    status.textContent = 'Key should start with sk-ant-…';
+    status.className   = 'text-xs text-red-500';
+  }
+});
 
 document.getElementById('cv-file-input').addEventListener('change', e => {
   const file = e.target.files[0];
