@@ -246,6 +246,7 @@
           <label for="cv-file-input" class="cv-browse-label">browse</label>
         </p>
         <p class="text-slate-400 text-xs mt-1">Accepts PDF, DOCX, or TXT &mdash; processed entirely in your browser</p>
+        <p id="cv-semantic-hint" class="hidden text-emerald-700 text-xs mt-1 font-medium">✨ Semantic matching active — understands meaning, not just keywords</p>
         <input type="file" id="cv-file-input" accept=".pdf,.docx,.txt" class="hidden">
       </div>
     </div>
@@ -255,7 +256,7 @@
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
       </svg>
-      Analyzing CV&hellip;
+      <span id="cv-status-msg">Analyzing CV…</span>
     </div>
     <!-- Error state -->
     <div id="cv-error" class="hidden text-center py-3 text-red-600 text-sm font-medium"></div>
@@ -265,7 +266,7 @@
 <!-- Match mode indicator bar -->
 <div id="cv-match-bar" class="hidden sticky top-[57px] z-10">
   <div class="max-w-6xl mx-auto px-4 flex items-center justify-between gap-4">
-    <span>🎯 Jobs ranked by match with <strong id="cv-filename-label"></strong></span>
+    <span>🎯 Jobs ranked by <span id="cv-match-method">semantic</span> match with <strong id="cv-filename-label"></strong></span>
     <button id="btn-cv-remove" type="button" class="text-blue-200 hover:text-white text-xs underline whitespace-nowrap">
       Remove CV &times;
     </button>
@@ -440,6 +441,9 @@ async function loadData() {
     document.getElementById('meta-bar').innerHTML =
       `<span class="font-semibold text-white">${allJobs.length.toLocaleString()}</span>` +
       ` open positions &bull; Updated ${data.meta.last_updated || 'recently'}`;
+
+    // Try loading pre-computed embeddings (resolves silently if file absent)
+    tryLoadEmbeddings();
 
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
@@ -794,12 +798,94 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 // ── CV Matching ─────────────────────────────────────────────────────────────────
 let cvScores  = {};     // jobId → normalised score 0‥1
 let matchMode = false;
-let idfCache  = null;
 
-if (typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+// ── Semantic matching (primary) ─────────────────────────────────────────────────
+const EMB_DIM       = 384;          // all-MiniLM-L6-v2 output dimension
+let jobEmbeddings   = null;         // Float32Array [n_jobs × 384], pre-computed
+let jobEmbMeta      = null;         // {jobId: rowIndex}
+let embLoaded       = false;
+let xenovaPipeline  = null;         // cached Transformers.js pipeline
+
+// Try to load pre-computed embeddings silently on startup
+async function tryLoadEmbeddings() {
+  try {
+    const [metaRes, binRes] = await Promise.all([
+      fetch('job_embeddings_meta.json'),
+      fetch('job_embeddings.bin'),
+    ]);
+    if (!metaRes.ok || !binRes.ok) return;
+    jobEmbMeta    = await metaRes.json();
+    jobEmbeddings = new Float32Array(await binRes.arrayBuffer());
+    embLoaded     = true;
+    // Update CV panel hint
+    const hint = document.getElementById('cv-semantic-hint');
+    if (hint) hint.classList.remove('hidden');
+    console.log(`Semantic embeddings loaded: ${Object.keys(jobEmbMeta).length} jobs`);
+  } catch (_) {
+    console.log('No pre-computed embeddings — TF-IDF fallback active');
+  }
 }
+
+function cosine(a, b) {
+  // Both vectors are L2-normalised, so dot product = cosine similarity
+  let dot = 0;
+  for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
+  return dot;
+}
+
+async function getCVEmbedding(text) {
+  if (!xenovaPipeline) {
+    updateCVStatus('Loading language model (first time ~22 MB, then cached)…');
+    // Dynamic import keeps the main page fast when CV matching isn't used
+    const { pipeline, env } = await import(
+      'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1'
+    );
+    env.allowLocalModels = false;
+    xenovaPipeline = await pipeline(
+      'feature-extraction',
+      'Xenova/all-MiniLM-L6-v2',
+      { quantized: true,
+        progress_callback: p => {
+          if (p.status === 'downloading') {
+            const pct = p.total ? Math.round(p.loaded / p.total * 100) : '…';
+            updateCVStatus(`Downloading language model: ${pct}%`);
+          } else if (p.status === 'loading') {
+            updateCVStatus('Loading model into memory…');
+          }
+        }
+      }
+    );
+  }
+  updateCVStatus('Computing your CV embedding…');
+  const out = await xenovaPipeline(text, { pooling: 'mean', normalize: true });
+  return out.data;   // Float32Array length 384
+}
+
+async function runSemanticMatching(cvText) {
+  const cvEmb = await getCVEmbedding(cvText);
+  updateCVStatus('Ranking jobs by semantic similarity…');
+
+  const raw = {};
+  allJobs.forEach(job => {
+    const idx = jobEmbMeta[job.id];
+    if (idx == null) { raw[job.id] = 0; return; }
+    const jobEmb = jobEmbeddings.subarray(idx * EMB_DIM, (idx + 1) * EMB_DIM);
+    raw[job.id] = cosine(cvEmb, jobEmb);
+  });
+
+  // Normalise to 0–1 relative to the best match
+  const vals = Object.values(raw);
+  const min  = Math.min(...vals), max = Math.max(...vals, min + 0.001);
+  cvScores = {};
+  allJobs.forEach(job => { cvScores[job.id] = (raw[job.id] - min) / (max - min); });
+
+  matchMode   = true;
+  currentPage = 1;
+  applyFilters();
+}
+
+// ── TF-IDF fallback (used when embeddings file not yet generated) ───────────────
+let idfCache = null;
 
 const STOPWORDS = new Set([
   'a','an','the','and','or','but','in','on','at','to','for','of','with','by',
@@ -823,58 +909,52 @@ function tokenize(text) {
 
 function buildIDF() {
   if (idfCache) return idfCache;
-  const docFreq = {};
-  const N = allJobs.length;
+  const docFreq = {}, N = allJobs.length;
   allJobs.forEach(job => {
-    const toks = new Set(tokenize(`${job.title} ${job.department||''} ${job.summary||''}`));
-    toks.forEach(t => { docFreq[t] = (docFreq[t] || 0) + 1; });
+    new Set(tokenize(`${job.title} ${job.department||''} ${job.summary||''}`))
+      .forEach(t => { docFreq[t] = (docFreq[t] || 0) + 1; });
   });
   idfCache = {};
   Object.keys(docFreq).forEach(t => {
-    idfCache[t] = Math.log((N + 1) / (docFreq[t] + 1)) + 1; // smoothed IDF
+    idfCache[t] = Math.log((N + 1) / (docFreq[t] + 1)) + 1;
   });
   return idfCache;
 }
 
-function scoreJob(job, cvFreq, idf) {
-  const titleToks   = tokenize(job.title || '');
-  const deptToks    = tokenize(job.department || '');
-  const summaryToks = tokenize(job.summary || '');
-  let score = 0;
-  for (const [term, freq] of Object.entries(cvFreq)) {
-    const termIDF = idf[term] || 0;
-    if (!termIDF) continue;
-    const w = (titleToks.includes(term) ? 4 : 0) ||
-              (deptToks.includes(term)  ? 2 : 0) ||
-              (summaryToks.includes(term) ? 1 : 0);
-    if (w) score += Math.sqrt(freq) * termIDF * w;
-  }
-  return score;
-}
-
-function runCVMatching(cvText) {
-  const idf   = buildIDF();
-  const toks  = tokenize(cvText);
-  const freq  = {};
-  toks.forEach(t => { freq[t] = (freq[t] || 0) + 1; });
+function runTFIDFMatching(cvText) {
+  const idf = buildIDF(), freq = {};
+  tokenize(cvText).forEach(t => { freq[t] = (freq[t] || 0) + 1; });
 
   const raw = {};
-  allJobs.forEach(job => { raw[job.id] = scoreJob(job, freq, idf); });
+  allJobs.forEach(job => {
+    const tt = tokenize(job.title || ''), dt = tokenize(job.department || ''), st = tokenize(job.summary || '');
+    let s = 0;
+    for (const [term, f] of Object.entries(freq)) {
+      const termIDF = idf[term] || 0;
+      if (!termIDF) continue;
+      const w = tt.includes(term) ? 4 : dt.includes(term) ? 2 : st.includes(term) ? 1 : 0;
+      if (w) s += Math.sqrt(f) * termIDF * w;
+    }
+    raw[job.id] = s;
+  });
 
-  const maxScore = Math.max(...Object.values(raw), 1);
+  const maxS = Math.max(...Object.values(raw), 1);
   cvScores = {};
-  allJobs.forEach(job => { cvScores[job.id] = raw[job.id] / maxScore; });
+  allJobs.forEach(job => { cvScores[job.id] = raw[job.id] / maxS; });
+  matchMode = true; currentPage = 1; applyFilters();
+}
 
-  matchMode = true;
-  currentPage = 1;
-  applyFilters();
+// ── Shared helpers ──────────────────────────────────────────────────────────────
+function updateCVStatus(msg) {
+  const el = document.getElementById('cv-status-msg');
+  if (el) el.textContent = msg;
 }
 
 function matchBadge(score) {
   const pct = Math.round(score * 100);
   if (pct < 5) return '';
-  const cls   = pct >= 55 ? 'match-high' : pct >= 25 ? 'match-med' : 'match-low';
-  const label = pct >= 55 ? `⭐ ${pct}% match` : `${pct}% match`;
+  const cls   = pct >= 60 ? 'match-high' : pct >= 30 ? 'match-med' : 'match-low';
+  const label = pct >= 60 ? `⭐ ${pct}% match` : `${pct}% match`;
   return `<span class="badge ${cls}">${label}</span>`;
 }
 
@@ -910,9 +990,16 @@ async function parseAndMatchCV(file) {
 
     if (text.trim().length < 20) throw new Error('Could not read text from this file.');
 
-    runCVMatching(text);
+    // Route to semantic or TF-IDF depending on whether embeddings are loaded
+    if (embLoaded) {
+      await runSemanticMatching(text);
+    } else {
+      updateCVStatus('Running keyword match (TF-IDF)…');
+      runTFIDFMatching(text);
+    }
 
     // Show match bar, hide panel
+    document.getElementById('cv-match-method').textContent = embLoaded ? 'semantic' : 'keyword';
     document.getElementById('cv-filename-label').textContent = file.name;
     document.getElementById('cv-panel').classList.add('hidden');
     document.getElementById('cv-match-bar').classList.remove('hidden');
