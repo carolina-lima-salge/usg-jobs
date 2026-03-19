@@ -249,17 +249,8 @@
         <p id="cv-semantic-hint" class="hidden text-emerald-700 text-xs mt-1 font-medium">✨ Semantic matching active — understands meaning, not just keywords</p>
         <input type="file" id="cv-file-input" accept=".pdf,.docx,.txt" class="hidden">
       </div>
-      <!-- Optional AI key -->
-      <div class="mt-3 pt-3 border-t border-blue-100">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-xs text-slate-500 whitespace-nowrap">🤖 Optional: Anthropic API key for Claude AI matching</span>
-          <input id="cv-api-key" type="password" placeholder="sk-ant-api03-…"
-            class="flex-1 min-w-[200px] border border-blue-200 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-700 focus:outline-none focus:border-blue-400"
-            autocomplete="off" spellcheck="false">
-          <span id="cv-api-key-status" class="text-xs text-slate-400"></span>
-        </div>
-        <p class="text-xs text-slate-400 mt-1">Key stays in browser memory only — never stored or sent anywhere except Anthropic's API. Claude reads your CV and the top job matches to provide smarter scores and explanations.</p>
-      </div>
+      <!-- AI matching note -->
+      <p class="mt-3 pt-3 border-t border-blue-100 text-xs text-emerald-700 font-medium">🤖 Claude AI matching active — hover over match badges to see why each job was scored</p>
     </div>
     <!-- Analyzing state -->
     <div id="cv-analyzing" class="hidden text-center py-5 text-blue-700 font-medium">
@@ -810,7 +801,8 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 let cvScores  = {};     // jobId → normalised score 0‥1
 let cvReasons = {};     // jobId → one-sentence explanation (from Claude AI)
 let matchMode = false;
-let anthropicApiKey = '';  // optional — held in memory only, never persisted
+// Cloudflare Worker URL — replace with your actual worker URL after deploying
+const WORKER_URL = 'https://usg-jobs-proxy.csalge611.workers.dev';
 
 // ── Semantic matching (primary) ─────────────────────────────────────────────────
 const EMB_DIM       = 384;          // all-MiniLM-L6-v2 output dimension
@@ -1108,14 +1100,9 @@ ${cvExcerpt}
 JOBS TO EVALUATE:
 ${jobsList}`;
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+  const resp = await fetch(WORKER_URL, {
     method: 'POST',
-    headers: {
-      'x-api-key': anthropicApiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 3000,
@@ -1163,18 +1150,21 @@ async function parseAndMatchCV(file) {
 
     if (text.trim().length < 20) throw new Error('Could not read text from this file.');
 
-    // Route: Claude AI > semantic embeddings > TF-IDF keyword fallback
+    // Route: Claude AI (via Worker) > semantic embeddings > TF-IDF keyword fallback
     let method;
-    if (anthropicApiKey) {
+    try {
       await runLLMMatching(text);
       method = '🤖 Claude AI';
-    } else if (embLoaded) {
-      await runSemanticMatching(text);
-      method = 'semantic';
-    } else {
-      updateCVStatus('Running keyword match (TF-IDF)…');
-      runTFIDFMatching(text);
-      method = 'keyword';
+    } catch (llmErr) {
+      console.warn('Claude AI matching unavailable, falling back:', llmErr.message);
+      if (embLoaded) {
+        await runSemanticMatching(text);
+        method = 'semantic';
+      } else {
+        updateCVStatus('Running keyword match…');
+        runTFIDFMatching(text);
+        method = 'keyword';
+      }
     }
 
     // Show match bar, hide panel
@@ -1221,23 +1211,6 @@ document.getElementById('btn-cv-toggle').addEventListener('click', () => {
 
 document.getElementById('btn-cv-remove').addEventListener('click', clearCVMatch);
 
-// API key input — validate format and store in memory
-document.getElementById('cv-api-key').addEventListener('input', e => {
-  const val    = e.target.value.trim();
-  const status = document.getElementById('cv-api-key-status');
-  if (!val) {
-    anthropicApiKey = '';
-    status.textContent = '';
-  } else if (val.startsWith('sk-ant-')) {
-    anthropicApiKey = val;
-    status.textContent = '✓ ready';
-    status.className   = 'text-xs text-emerald-600 font-medium';
-  } else {
-    anthropicApiKey = '';
-    status.textContent = 'Key should start with sk-ant-…';
-    status.className   = 'text-xs text-red-500';
-  }
-});
 
 document.getElementById('cv-file-input').addEventListener('change', e => {
   const file = e.target.files[0];
