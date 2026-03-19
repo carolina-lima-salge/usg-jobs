@@ -861,8 +861,42 @@ async function getCVEmbedding(text) {
   return out.data;   // Float32Array length 384
 }
 
+// ── Seniority detection helpers ────────────────────────────────────────────────
+// Returns 0 (student/entry), 1 (mid), 2 (senior), 3 (exec/PhD)
+function detectCVLevel(cvText) {
+  const t = cvText.toLowerCase();
+  let level = 0;
+  if (/\bph\.?d\.?\b|\bdoctoral?\b|\bdissertation\b|\bdoctorate\b/.test(t)) level = Math.max(level, 3);
+  else if (/\bmaster'?s?\b|\bm\.?s\.?\b|\bm\.?a\.?\b|\bmba\b|\bm\.?ed\.?\b/.test(t)) level = Math.max(level, 2);
+  if (/\bdirector\b|\bvp\b|\bvice president\b|\bchief\b|\bdean\b|\bpresident\b/.test(t)) level = Math.max(level, 3);
+  if (/\bmanager\b|\bsupervisor\b|\bsuperintendent\b/.test(t)) level = Math.max(level, 2);
+  if (/\b(1[5-9]|2\d|30)\+?\s*years?\b/.test(t)) level = Math.max(level, 2);
+  return level;
+}
+
+// Returns 0 (student), 1 (intern/entry), 2 (mid), 3 (senior/exec)
+function detectJobLevel(job) {
+  const t = `${job.title || ''} ${job.summary || ''}`.toLowerCase();
+  if (/\bstudent (worker|ambassador|assistant|aide|employee|scholar)\b|\bwork[- ]?study\b|\bgraduate (assistant|student)\b|\bundergrad(uate)?\b/.test(t)) return 0;
+  if (/\bintern(ship)?\b|\bentry[- ]?level\b|\bjunior\b/.test(t)) return 1;
+  if (/\bdirector\b|\bvp\b|\bvice president\b|\bchief\b|\bdean\b|\bfull professor\b|\bassociate professor\b/.test(t)) return 3;
+  // Also check the title alone for plain "student" (catches "Student Ambassador" etc.)
+  if (/\bstudent\b/.test((job.title || '').toLowerCase())) return 0;
+  return 2;
+}
+
+// Penalty multiplier when CV seniority significantly exceeds job level
+function seniorityPenalty(cvLevel, jobLevel) {
+  const diff = cvLevel - jobLevel;
+  if (diff >= 3) return 0.20;  // PhD/Director → Student job
+  if (diff >= 2) return 0.45;  // Senior → Entry/Intern
+  if (diff >= 1) return 0.75;  // Mid-level → Student/Entry
+  return 1.0;
+}
+
 async function runSemanticMatching(cvText) {
-  const cvEmb = await getCVEmbedding(cvText);
+  const cvEmb  = await getCVEmbedding(cvText);
+  const cvLevel = detectCVLevel(cvText);
   updateCVStatus('Ranking jobs by semantic similarity…');
 
   const raw = {};
@@ -873,11 +907,16 @@ async function runSemanticMatching(cvText) {
     raw[job.id] = cosine(cvEmb, jobEmb);
   });
 
-  // Normalise to 0–1 relative to the best match
-  const vals = Object.values(raw);
-  const min  = Math.min(...vals), max = Math.max(...vals, min + 0.001);
+  // Calibrated absolute scoring — avoids inflating all scores via min-max.
+  // Raw cosine 0.10 → 0%,  0.65 → 100% (linear). Typical unrelated pairs
+  // score ~0.15-0.25; strong matches score 0.55+.
+  const LOW = 0.10, HIGH = 0.65;
   cvScores = {};
-  allJobs.forEach(job => { cvScores[job.id] = (raw[job.id] - min) / (max - min); });
+  allJobs.forEach(job => {
+    const abs     = Math.max(0, Math.min(1, (raw[job.id] - LOW) / (HIGH - LOW)));
+    const penalty = seniorityPenalty(cvLevel, detectJobLevel(job));
+    cvScores[job.id] = abs * penalty;
+  });
 
   matchMode   = true;
   currentPage = 1;
@@ -923,6 +962,7 @@ function buildIDF() {
 
 function runTFIDFMatching(cvText) {
   const idf = buildIDF(), freq = {};
+  const cvLevel = detectCVLevel(cvText);
   tokenize(cvText).forEach(t => { freq[t] = (freq[t] || 0) + 1; });
 
   const raw = {};
@@ -938,9 +978,14 @@ function runTFIDFMatching(cvText) {
     raw[job.id] = s;
   });
 
+  // Normalise relative to best match, then apply seniority penalty
   const maxS = Math.max(...Object.values(raw), 1);
   cvScores = {};
-  allJobs.forEach(job => { cvScores[job.id] = raw[job.id] / maxS; });
+  allJobs.forEach(job => {
+    const rel     = raw[job.id] / maxS;
+    const penalty = seniorityPenalty(cvLevel, detectJobLevel(job));
+    cvScores[job.id] = rel * penalty;
+  });
   matchMode = true; currentPage = 1; applyFilters();
 }
 
