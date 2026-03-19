@@ -53,6 +53,47 @@
       outline: none; cursor: pointer;
     }
     select.filter-select:focus { box-shadow: 0 0 0 2px #93c5fd; border-color: #60a5fa; }
+    /* Multi-select dropdown */
+    .multiselect { position: relative; }
+    .multiselect-btn {
+      border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 12px;
+      font-size: 0.875rem; background: white; color: #374151;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      white-space: nowrap; outline: none;
+    }
+    .multiselect-btn:focus { box-shadow: 0 0 0 2px #93c5fd; border-color: #60a5fa; }
+    .multiselect-btn.active { border-color: #3b82f6; background: #eff6ff; color: #1e3a5f; }
+    .ms-count {
+      background: #1e3a5f; color: white; border-radius: 9999px;
+      font-size: 0.65rem; font-weight: 700; padding: 1px 6px; line-height: 1.4;
+    }
+    .multiselect-panel {
+      position: absolute; top: calc(100% + 4px); left: 0;
+      background: white; border: 1px solid #e2e8f0; border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12); z-index: 100;
+      min-width: 230px; display: flex; flex-direction: column;
+    }
+    .multiselect-panel.hidden { display: none; }
+    .ms-search { padding: 8px 8px 4px; }
+    .ms-search-input {
+      width: 100%; border: 1px solid #e2e8f0; border-radius: 6px;
+      padding: 5px 9px; font-size: 0.8rem; outline: none;
+    }
+    .ms-search-input:focus { border-color: #93c5fd; box-shadow: 0 0 0 2px #dbeafe; }
+    .ms-options { overflow-y: auto; max-height: 240px; padding: 4px; }
+    .ms-option {
+      display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+      border-radius: 6px; cursor: pointer; font-size: 0.83rem; color: #374151;
+      user-select: none;
+    }
+    .ms-option:hover { background: #f1f5f9; }
+    .ms-option input[type="checkbox"] { accent-color: #1e3a5f; cursor: pointer; flex-shrink: 0; }
+    .ms-footer { border-top: 1px solid #f1f5f9; padding: 6px 12px; }
+    .ms-clear-btn {
+      font-size: 0.75rem; color: #3b82f6; cursor: pointer;
+      background: none; border: none; padding: 0;
+    }
+    .ms-clear-btn:hover { text-decoration: underline; }
   </style>
 </head>
 
@@ -88,10 +129,19 @@
                class="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
       </div>
 
-      <!-- Institution -->
-      <select id="f-institution" class="filter-select">
-        <option value="">All Institutions</option>
-      </select>
+      <!-- Institution multi-select -->
+      <div class="multiselect">
+        <button class="multiselect-btn" id="ms-inst-btn" type="button">
+          Institutions
+          <span class="ms-count hidden" id="ms-inst-count"></span>
+          <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="multiselect-panel hidden" id="ms-inst-panel">
+          <div class="ms-search"><input type="text" placeholder="Search institutions…" class="ms-search-input" id="ms-inst-search"></div>
+          <div class="ms-options" id="ms-inst-options"></div>
+          <div class="ms-footer"><button class="ms-clear-btn" id="ms-inst-clear" type="button">Clear all</button></div>
+        </div>
+      </div>
 
       <!-- Job type -->
       <select id="f-type" class="filter-select">
@@ -100,10 +150,19 @@
         <option value="Part-Time">Part-Time</option>
       </select>
 
-      <!-- Location -->
-      <select id="f-location" class="filter-select">
-        <option value="">All Locations</option>
-      </select>
+      <!-- Location multi-select -->
+      <div class="multiselect">
+        <button class="multiselect-btn" id="ms-loc-btn" type="button">
+          Location
+          <span class="ms-count hidden" id="ms-loc-count"></span>
+          <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="multiselect-panel hidden" id="ms-loc-panel">
+          <div class="ms-search"><input type="text" placeholder="Search locations…" class="ms-search-input" id="ms-loc-search"></div>
+          <div class="ms-options" id="ms-loc-options"></div>
+          <div class="ms-footer"><button class="ms-clear-btn" id="ms-loc-clear" type="button">Clear all</button></div>
+        </div>
+      </div>
 
       <!-- Posted within -->
       <select id="f-posted" class="filter-select">
@@ -182,6 +241,77 @@ let filtered   = [];
 let currentPage = 1;
 let expandedId  = null;
 
+// Multi-select state
+const selectedInsts = new Set();
+const selectedLocs  = new Set();
+
+// ── Multi-select helpers ────────────────────────────────────────────────────────
+function buildMultiselect(optContainerId, searchInputId, clearBtnId, btnId, countId, panelId, items, selectedSet) {
+  const optContainer = document.getElementById(optContainerId);
+  items.forEach(item => {
+    const lbl = document.createElement('label');
+    lbl.className = 'ms-option';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = item;
+    cb.addEventListener('change', () => {
+      if (cb.checked) selectedSet.add(item); else selectedSet.delete(item);
+      updateMultiselectBtn(btnId, countId, selectedSet);
+      currentPage = 1; applyFilters();
+    });
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(' ' + item));
+    optContainer.appendChild(lbl);
+  });
+
+  // Search within panel
+  document.getElementById(searchInputId).addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    optContainer.querySelectorAll('.ms-option').forEach(opt => {
+      opt.style.display = opt.textContent.trim().toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+
+  // Clear button
+  document.getElementById(clearBtnId).addEventListener('click', () => {
+    selectedSet.clear();
+    optContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    updateMultiselectBtn(btnId, countId, selectedSet);
+    currentPage = 1; applyFilters();
+  });
+
+  // Toggle panel open/close
+  document.getElementById(btnId).addEventListener('click', e => {
+    e.stopPropagation();
+    const panel = document.getElementById(panelId);
+    const isOpen = !panel.classList.contains('hidden');
+    closeAllMultiselectPanels();
+    if (!isOpen) panel.classList.remove('hidden');
+  });
+
+  // Stop clicks inside panel from bubbling to document (which would close it)
+  document.getElementById(panelId).addEventListener('click', e => e.stopPropagation());
+}
+
+function updateMultiselectBtn(btnId, countId, selectedSet) {
+  const btn   = document.getElementById(btnId);
+  const count = document.getElementById(countId);
+  if (selectedSet.size > 0) {
+    btn.classList.add('active');
+    count.textContent = selectedSet.size;
+    count.classList.remove('hidden');
+  } else {
+    btn.classList.remove('active');
+    count.classList.add('hidden');
+  }
+}
+
+function closeAllMultiselectPanels() {
+  document.querySelectorAll('.multiselect-panel').forEach(p => p.classList.add('hidden'));
+}
+
+// Close panels when clicking outside
+document.addEventListener('click', closeAllMultiselectPanels);
+
 // ── Date utilities ─────────────────────────────────────────────────────────────
 function parseDate(s) {
   if (!s) return null;
@@ -222,23 +352,19 @@ async function loadData() {
     const data = await res.json();
     allJobs = data.jobs || [];
 
-    // Populate institution dropdown
-    const instSel = document.getElementById('f-institution');
-    (data.meta.institutions || []).forEach(inst => {
-      const opt = document.createElement('option');
-      opt.value = inst;
-      opt.textContent = inst;
-      instSel.appendChild(opt);
-    });
+    // Build institution multi-select
+    buildMultiselect(
+      'ms-inst-options', 'ms-inst-search', 'ms-inst-clear',
+      'ms-inst-btn', 'ms-inst-count', 'ms-inst-panel',
+      data.meta.institutions || [], selectedInsts
+    );
 
-    // Populate location dropdown
-    const locSel = document.getElementById('f-location');
-    (data.meta.locations || []).forEach(loc => {
-      const opt = document.createElement('option');
-      opt.value = loc;
-      opt.textContent = loc;
-      locSel.appendChild(opt);
-    });
+    // Build location multi-select
+    buildMultiselect(
+      'ms-loc-options', 'ms-loc-search', 'ms-loc-clear',
+      'ms-loc-btn', 'ms-loc-count', 'ms-loc-panel',
+      data.meta.locations || [], selectedLocs
+    );
 
     // Meta bar
     document.getElementById('meta-bar').innerHTML =
@@ -284,9 +410,7 @@ function onSearchInput() {
 
 function applyFilters() {
   const q          = document.getElementById('search').value.trim().toLowerCase();
-  const inst       = document.getElementById('f-institution').value;
   const type       = document.getElementById('f-type').value.toLowerCase();
-  const loc        = document.getElementById('f-location').value;
   const posted     = parseInt(document.getElementById('f-posted').value) || 0;
   const sort       = document.getElementById('f-sort').value;
   const salOnly    = document.getElementById('f-salary').checked;
@@ -294,18 +418,18 @@ function applyFilters() {
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || inst || type || loc || posted || salOnly || remoteOnly || sort !== 'newest';
+  const hasFilters = q || selectedInsts.size > 0 || type || selectedLocs.size > 0 || posted || salOnly || remoteOnly || sort !== 'newest';
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
-    if (inst && job.institution !== inst) return false;
+    if (selectedInsts.size > 0 && !selectedInsts.has(job.institution)) return false;
 
     if (type) {
       const ft = (job.type || '').toLowerCase();
       if (!ft.includes(type)) return false;
     }
 
-    if (loc && job.location !== loc) return false;
+    if (selectedLocs.size > 0 && !selectedLocs.has(job.location)) return false;
 
     if (cutoff) {
       const d = parseDate(job.posted);
@@ -559,7 +683,7 @@ function goPage(p) {
 
 // ── Event listeners ────────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', onSearchInput);
-['f-institution','f-type','f-location','f-posted','f-sort'].forEach(id => {
+['f-type','f-posted','f-sort'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); });
 });
 document.getElementById('f-salary').addEventListener('change',  () => { currentPage = 1; applyFilters(); });
@@ -567,11 +691,27 @@ document.getElementById('f-remote').addEventListener('change',  () => { currentP
 
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
-  ['f-institution','f-type','f-location','f-posted','f-sort'].forEach(id => {
+  ['f-type','f-posted','f-sort'].forEach(id => {
     document.getElementById(id).value = id === 'f-sort' ? 'newest' : '';
   });
   document.getElementById('f-salary').checked = false;
   document.getElementById('f-remote').checked = false;
+
+  // Clear multi-selects
+  selectedInsts.clear();
+  selectedLocs.clear();
+  ['ms-inst-options','ms-loc-options'].forEach(id => {
+    document.getElementById(id).querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  });
+  updateMultiselectBtn('ms-inst-btn', 'ms-inst-count', selectedInsts);
+  updateMultiselectBtn('ms-loc-btn',  'ms-loc-count',  selectedLocs);
+  // Reset search inputs in panels
+  document.getElementById('ms-inst-search').value = '';
+  document.getElementById('ms-loc-search').value  = '';
+  ['ms-inst-options','ms-loc-options'].forEach(id => {
+    document.getElementById(id).querySelectorAll('.ms-option').forEach(o => o.style.display = '');
+  });
+
   currentPage = 1;
   applyFilters();
 });
