@@ -818,7 +818,7 @@ function renderCard(job) {
     job.department ? esc(job.department) : '',
     job.location   ? esc(job.location)   : '',
     closes         ? closes              : '',
-    job.salary     ? `<span style="color:#166534;font-weight:500;">${esc(job.salary)}</span>` : '',
+    job.salary     ? `<span style="color:#166534;font-weight:500;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${salaryTag(job)}</span></span>` : '',
   ].filter(Boolean).join('<span style="margin:0 8px;color:var(--border-strong);">·</span>');
 
   return `
@@ -829,7 +829,7 @@ function renderCard(job) {
         <span class="row-title-text">${esc(job.title || 'Untitled Position')}</span>
         ${cvMatchHtml}
       </div>
-      ${job.salary ? `<div style="font-size:0.71rem;color:#166534;font-weight:500;margin-top:2px;">${esc(job.salary)}</div>` : ''}
+      ${job.salary ? `<div style="font-size:0.71rem;color:#166534;font-weight:500;margin-top:2px;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${salaryTag(job)}</span></div>` : ''}
     </div>
     <div class="row-col col-inst">
       <span class="badge ${badgeCls}">${esc(instLabel)}</span>
@@ -849,6 +849,20 @@ function renderCard(job) {
     </div>
   </div>
 </div>`;
+}
+
+function salaryTag(job) {
+  const t = (job.salary_type || '').toLowerCase();
+  const s = (job.salary || '').toLowerCase();
+  if (t === 'hourly' || s.includes('hour') || s.includes('/hr')) return '/hr';
+  if (t === 'annual') return '/yr';
+  // Infer from magnitude when type is missing
+  const num = parseFloat(s.replace(/[^0-9.]/g, ''));
+  if (!isNaN(num) && num > 0) {
+    if (num < 500) return '/hr';
+    if (num > 5000) return '/yr';
+  }
+  return '';
 }
 
 function fmtDateShort(str) {
