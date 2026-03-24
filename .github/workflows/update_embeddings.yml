@@ -30,10 +30,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
 
       - name: Install dependencies
-        run: pip install fastembed "numpy<2"
+        run: |
+          pip install --upgrade pip
+          pip install fastembed numpy
 
       - name: Generate embeddings
         run: python generate_embeddings.py
