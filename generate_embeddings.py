@@ -4,7 +4,7 @@ Generate semantic embeddings for all USG job listings.
 
 Run this ONCE from the usg-jobs directory:
 
-    pip install sentence-transformers
+    pip install fastembed "numpy<2"
     python3 generate_embeddings.py
 
 This creates two files in the same directory:
@@ -23,10 +23,10 @@ import json, sys, numpy as np
 from pathlib import Path
 
 try:
-    from sentence_transformers import SentenceTransformer
+    from fastembed import TextEmbedding
 except ImportError:
-    print("ERROR: sentence-transformers is not installed.")
-    print("       Run:  pip install sentence-transformers")
+    print("ERROR: fastembed is not installed.")
+    print("       Run:  pip install fastembed 'numpy<2'")
     sys.exit(1)
 
 # ── Load jobs ──────────────────────────────────────────────────────────────────
@@ -56,20 +56,23 @@ texts = [job_text(j) for j in jobs]
 ids   = [j["id"] for j in jobs]
 
 # ── Load model ────────────────────────────────────────────────────────────────
-MODEL = "all-MiniLM-L6-v2"
+MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 print(f"\nLoading model '{MODEL}'...")
 print("  (First run downloads ~90 MB from HuggingFace and caches it locally)\n")
-model = SentenceTransformer(MODEL)
+model = TextEmbedding(model_name=MODEL)
 
 # ── Compute embeddings ────────────────────────────────────────────────────────
-print("Computing embeddings (this takes ~1-2 minutes)...")
-embeddings = model.encode(
-    texts,
-    batch_size=64,
-    show_progress_bar=True,
-    normalize_embeddings=True,   # L2-normalise so cosine sim = dot product
-    convert_to_numpy=True,
-).astype(np.float32)
+print(f"Computing embeddings for {len(texts)} jobs (this takes ~1-2 minutes)...")
+embeddings_iter = model.embed(texts)
+
+# fastembed returns a generator — collect into a list then stack
+emb_list = list(embeddings_iter)
+embeddings = np.array(emb_list, dtype=np.float32)
+
+# L2-normalise so cosine similarity = dot product (matches browser-side behaviour)
+norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+norms = np.where(norms == 0, 1, norms)
+embeddings = (embeddings / norms).astype(np.float32)
 
 print(f"\nEmbeddings shape: {embeddings.shape}  (jobs × dimensions)")
 
