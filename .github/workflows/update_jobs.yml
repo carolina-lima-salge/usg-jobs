@@ -1,0 +1,84 @@
+name: Daily Job Update
+
+on:
+  # Run every day at 6 AM ET (11 AM UTC)
+  schedule:
+    - cron: '0 11 * * *'
+
+  # Allow manual trigger from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  update-jobs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to commit and push
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install scraper dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests beautifulsoup4 lxml playwright
+
+      - name: Install Playwright Chromium (for Georgia State scraper)
+        run: python -m playwright install chromium --with-deps
+        continue-on-error: true   # scraper falls back to requests if this fails
+
+      - name: Run UGA scraper
+        working-directory: scrapers
+        run: python scraper.py
+        continue-on-error: true
+
+      - name: Run Georgia Tech scraper
+        working-directory: scrapers
+        run: python scraper_gatech.py
+        continue-on-error: true
+
+      - name: Run Georgia State scraper
+        working-directory: scrapers
+        run: python scraper_gastate.py
+        continue-on-error: true
+
+      - name: Run USG OneHCM scraper (23 institutions)
+        working-directory: scrapers
+        run: python scraper_onehcm.py
+        continue-on-error: true
+
+      - name: Merge all scrapers into usg_all_jobs.csv
+        working-directory: scrapers
+        run: python merge_all.py
+
+      - name: Build jobs.json for the website
+        working-directory: scrapers
+        run: |
+          python prepare_data.py
+          cp jobs.json ../jobs.json
+
+      - name: Install embedding dependencies
+        run: pip install fastembed numpy
+
+      - name: Generate job embeddings
+        run: python generate_embeddings.py
+
+      - name: Commit and push all updates
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add jobs.json job_embeddings.bin job_embeddings_meta.json
+          if git diff --cached --quiet; then
+            echo "No changes — skipping commit."
+          else
+            TOTAL=$(python3 -c "import json; d=json.load(open('jobs.json')); print(d.get('total',0))")
+            git commit -m "Auto-update jobs data: ${TOTAL} listings [skip ci]"
+            git push
+          fi

@@ -275,10 +275,6 @@
     .cv-dropzone.loaded { border-color: #86efac; background: #f0fdf4; cursor: default; }
     .cv-browse-label { color: var(--accent); font-weight: 500; cursor: pointer; }
     .cv-browse-label:hover { text-decoration: underline; }
-    #cv-match-bar {
-      background: var(--header-bg); color: #cbd5e1; font-size: 0.76rem;
-      padding: 6px 16px; display: flex; align-items: center; gap: 8px;
-    }
 
     /* ── Mobile meta (hidden on desktop) ── */
     .mob-meta { display: none; }
@@ -494,12 +490,6 @@
   </div>
 </div>
 
-<!-- Match mode indicator bar -->
-<div id="cv-match-bar" class="hidden sticky top-[49px] z-10">
-  <div style="max-width:1100px;margin:0 auto;padding:0 20px;height:32px;display:flex;align-items:center;">
-    <span style="font-size:0.75rem;">Ranked by <span id="cv-match-method">semantic</span> match &mdash; <strong id="cv-filename-label"></strong></span>
-  </div>
-</div>
 <!-- hidden anchor for JS — btn-cv-remove kept so JS event listener doesn't throw -->
 <button id="btn-cv-remove" style="display:none;" type="button"></button>
 
@@ -1421,11 +1411,8 @@ async function parseAndMatchCV(file) {
       }
     }
 
-    // Show match bar, hide panel
-    document.getElementById('cv-match-method').textContent = method;
-    document.getElementById('cv-filename-label').textContent = file.name;
+    // Hide panel after CV loaded
     document.getElementById('cv-panel').classList.add('hidden');
-    document.getElementById('cv-match-bar').classList.remove('hidden');
     const cvBtn = document.getElementById('btn-cv-toggle');
     cvBtn.textContent = 'Remove CV ×';
     cvBtn.style.background = 'var(--surface)';
@@ -1451,7 +1438,6 @@ function clearCVMatch() {
   matchMode    = false;
   document.getElementById('coach-panel').classList.remove('open', 'minimized');
   currentPage = 1;
-  document.getElementById('cv-match-bar').classList.add('hidden');
   document.getElementById('cv-panel').classList.add('hidden');
   document.getElementById('cv-analyzing').classList.add('hidden');
   document.getElementById('cv-idle-zone').classList.remove('hidden');

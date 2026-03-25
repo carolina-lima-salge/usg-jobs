@@ -1,18 +1,17 @@
-name: Update Job Embeddings
+name: Update Job Embeddings (legacy — disabled)
+# This workflow is superseded by update_jobs.yml which runs scrapers + embeddings daily.
+# Kept here for reference only. The push trigger on jobs.json is preserved so that
+# if jobs.json is ever updated manually, embeddings still regenerate automatically.
 
 on:
-  # Run every Monday at 6 AM ET (after scrapers have had time to run)
-  schedule:
-    - cron: '0 11 * * 1'
+  # Allow manual trigger from the GitHub Actions tab
+  workflow_dispatch:
 
-  # Also run whenever jobs.json is updated (e.g. after a manual scraper run)
+  # Also run whenever jobs.json is updated by a push
   push:
     branches: [main]
     paths:
       - 'jobs.json'
-
-  # Allow manual trigger from the GitHub Actions tab
-  workflow_dispatch:
 
 jobs:
   generate-embeddings:
