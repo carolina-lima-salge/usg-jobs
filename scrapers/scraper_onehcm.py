@@ -768,7 +768,7 @@ def main():
         # We still need a browser for the Playwright fallback
         with sync_playwright() as p:
             browser = p.chromium.launch(
-                headless=False,
+                headless=True,
                 args=["--disable-blink-features=AutomationControlled"],
             )
             context = browser.new_context(
@@ -807,7 +807,7 @@ def main():
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            headless=False,
+            headless=True,
             args=["--disable-blink-features=AutomationControlled"],
         )
         context = browser.new_context(

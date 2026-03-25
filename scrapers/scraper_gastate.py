@@ -1401,7 +1401,7 @@ def scrape_faculty(page, portal_urls: list[tuple[str,str]]) -> list[dict]:
 
 def _make_browser(p):
     browser = p.chromium.launch(
-        headless=False,
+        headless=True,
         args=["--disable-blink-features=AutomationControlled"],
     )
     context = browser.new_context(
