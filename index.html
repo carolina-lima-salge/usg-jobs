@@ -280,20 +280,71 @@
       padding: 6px 16px; display: flex; align-items: center; gap: 8px;
     }
 
-    /* ── Mobile ── */
-    @media (max-width: 768px) {
-      .row-header { grid-template-columns: 1fr 130px 32px; }
-      .row-col.col-loc, .row-col.col-type, .row-col.col-date { display: none; }
-      #tbl-header { grid-template-columns: 1fr 130px 32px; }
-      .tbl-col-label.col-loc, .tbl-col-label.col-type, .tbl-col-label.col-date { display: none; }
+    /* ── Mobile meta (hidden on desktop) ── */
+    .mob-meta { display: none; }
+
+    /* ── Tablet (≤900px): shrink location column ── */
+    @media (max-width: 900px) {
+      .row-header { grid-template-columns: 1fr 150px 110px 85px 60px 26px; }
+      #tbl-header  { grid-template-columns: 1fr 150px 110px 85px 60px 26px; }
     }
-    @media (max-width: 520px) {
-      .row-header { grid-template-columns: 1fr 32px; padding: 10px 12px; }
-      .row-col.col-inst { display: none; }
+
+    /* ── Mobile (≤640px): switch to stacked card layout ── */
+    @media (max-width: 640px) {
+      /* Page padding */
+      main { padding: 10px !important; }
+      #results-panel { border-radius: 4px; }
+
+      /* Filter bar: single scrollable row */
+      #filter-bar > div { padding: 6px 10px !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      #filter-bar .filter-row { flex-wrap: nowrap; gap: 5px; }
+      #filter-bar .filter-row > div:first-child { min-width: 140px; flex: 0 0 140px; }
+      #filter-bar .filter-row::-webkit-scrollbar { display: none; }
+      #result-count { display: none; }
+
+      /* Header: shorten subtitle */
+      header span:last-child { display: none; }
+
+      /* Table header: hide */
       #tbl-header { display: none; }
-      #coach-panel { width: calc(100vw - 20px); right: 10px; bottom: 74px; }
-      #coach-btn { right: 14px; bottom: 14px; padding: 9px 14px; font-size: 0.8rem; }
-      #coach-nudge { right: 14px; bottom: 66px; }
+
+      /* Row: switch to flex column, drop grid */
+      .row-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: 11px 38px 11px 12px;
+        position: relative;
+        align-items: flex-start;
+      }
+      .row-header .chevron {
+        position: absolute;
+        right: 12px;
+        top: 13px;
+      }
+      /* Hide desktop-only grid cells */
+      .row-col.col-inst,
+      .row-col.col-loc,
+      .row-col.col-type,
+      .row-col.col-date { display: none; }
+      /* Show mobile meta row */
+      .mob-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 6px;
+        margin-top: 5px;
+      }
+      .mob-meta .m-sep { color: var(--text-3); font-size: 0.7rem; }
+      .mob-meta .m-txt { font-size: 0.75rem; color: var(--text-2); }
+
+      /* Row detail: reduce padding */
+      .row-detail { padding: 12px 14px 14px; }
+
+      /* Coach panel: full-width near bottom */
+      #coach-panel { width: calc(100vw - 16px); right: 8px; bottom: 70px; }
+      #coach-btn   { right: 14px; bottom: 14px; padding: 9px 14px; font-size: 0.8rem; }
+      #coach-nudge { right: 14px; bottom: 63px; max-width: 180px; }
     }
   </style>
 </head>
@@ -445,13 +496,12 @@
 
 <!-- Match mode indicator bar -->
 <div id="cv-match-bar" class="hidden sticky top-[49px] z-10">
-  <div style="max-width:1100px;margin:0 auto;padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;height:32px;">
-    <span style="font-size:0.75rem;">Jobs ranked by <span id="cv-match-method">semantic</span> match with <strong id="cv-filename-label"></strong></span>
-    <button id="btn-cv-remove" type="button" style="color:rgba(255,255,255,0.6);font-size:0.73rem;text-decoration:underline;background:none;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;">
-      Remove CV &times;
-    </button>
+  <div style="max-width:1100px;margin:0 auto;padding:0 20px;height:32px;display:flex;align-items:center;">
+    <span style="font-size:0.75rem;">Ranked by <span id="cv-match-method">semantic</span> match &mdash; <strong id="cv-filename-label"></strong></span>
   </div>
 </div>
+<!-- hidden anchor for JS — btn-cv-remove kept so JS event listener doesn't throw -->
+<button id="btn-cv-remove" style="display:none;" type="button"></button>
 
 <!-- ── Results ──────────────────────────────────────────────────────────────── -->
 <main style="max-width:1100px;margin:0 auto;padding:20px;">
@@ -821,6 +871,18 @@ function renderCard(job) {
     job.salary     ? `<span style="color:#166534;font-weight:500;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${salaryTag(job)}</span></span>` : '',
   ].filter(Boolean).join('<span style="margin:0 8px;color:var(--border-strong);">·</span>');
 
+  const tag = salaryTag(job);
+  const salaryLine = job.salary
+    ? `<div style="font-size:0.71rem;color:#166534;font-weight:500;margin-top:2px;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${tag}</span></div>`
+    : '';
+  // Mobile meta: institution · location · type · date on one line
+  const mobMetaParts = [
+    `<span class="badge ${badgeCls}">${esc(instLabel)}</span>`,
+    job.location ? `<span class="m-txt">${esc(job.location)}</span>` : '',
+    (typeBadgeHtml || remoteTag) ? `${typeBadgeHtml}${remoteTag}` : '',
+    postedShort !== '—' ? `<span class="m-txt" style="color:var(--text-3);">${postedShort}</span>` : '',
+  ].filter(Boolean).join('<span class="m-sep">·</span>');
+
   return `
 <div class="job-row" data-id="${esc(job.id)}">
   <div class="row-header">
@@ -829,7 +891,8 @@ function renderCard(job) {
         <span class="row-title-text">${esc(job.title || 'Untitled Position')}</span>
         ${cvMatchHtml}
       </div>
-      ${job.salary ? `<div style="font-size:0.71rem;color:#166534;font-weight:500;margin-top:2px;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${salaryTag(job)}</span></div>` : ''}
+      ${salaryLine}
+      <div class="mob-meta">${mobMetaParts}</div>
     </div>
     <div class="row-col col-inst">
       <span class="badge ${badgeCls}">${esc(instLabel)}</span>
@@ -854,14 +917,18 @@ function renderCard(job) {
 function salaryTag(job) {
   const t = (job.salary_type || '').toLowerCase();
   const s = (job.salary || '').toLowerCase();
-  if (t === 'hourly' || s.includes('hour') || s.includes('/hr')) return '/hr';
-  if (t === 'annual') return '/yr';
-  // Infer from magnitude when type is missing
+  // String clues always win
+  if (s.includes('hour') || s.includes('/hr')) return '/hr';
+  if (s.includes('/yr') || s.includes('annual')) return '/yr';
+  // Magnitude check beats salary_type field (field sometimes mislabeled)
   const num = parseFloat(s.replace(/[^0-9.]/g, ''));
   if (!isNaN(num) && num > 0) {
-    if (num < 500) return '/hr';
-    if (num > 5000) return '/yr';
+    if (num < 1000) return '/hr';   // $14, $25.50, etc. — always hourly
+    if (num > 8000) return '/yr';   // $45,000+  — always annual
   }
+  // Fall back to explicit field for ambiguous mid-range numbers
+  if (t === 'hourly') return '/hr';
+  if (t === 'annual') return '/yr';
   return '';
 }
 
@@ -1360,10 +1427,10 @@ async function parseAndMatchCV(file) {
     document.getElementById('cv-panel').classList.add('hidden');
     document.getElementById('cv-match-bar').classList.remove('hidden');
     const cvBtn = document.getElementById('btn-cv-toggle');
-    cvBtn.textContent = 'CV loaded';
-    cvBtn.style.background = 'var(--accent)';
-    cvBtn.style.color = 'white';
-    cvBtn.style.borderColor = 'var(--accent)';
+    cvBtn.textContent = 'Remove CV ×';
+    cvBtn.style.background = 'var(--surface)';
+    cvBtn.style.color = '#b91c1c';
+    cvBtn.style.borderColor = '#fca5a5';
     // coach button already visible always
 
   } catch (err) {
@@ -1395,12 +1462,13 @@ function clearCVMatch() {
   btn.style.background = 'var(--surface)';
   btn.style.color = 'var(--text-1)';
   btn.style.borderColor = 'var(--border)';
+  btn.style.fontWeight = '600';
   applyFilters();
 }
 
 // ── CV UI events ────────────────────────────────────────────────────────────────
 document.getElementById('btn-cv-toggle').addEventListener('click', () => {
-  if (matchMode) return; // already loaded — do nothing (remove is via × button)
+  if (matchMode) { clearCVMatch(); return; } // CV loaded — clicking removes it
   const panel = document.getElementById('cv-panel');
   panel.classList.toggle('hidden');
 });
@@ -1537,22 +1605,20 @@ function coachBuildSystemPrompt() {
       return `• ${j.title} at ${j.institution} (${pct}% match${reason})`;
     }).join('\n');
 
-  return `You are a friendly, expert CV coach helping a job seeker improve their application materials for University System of Georgia positions.
+  return `You are a concise CV coach for University System of Georgia job applicants.
 
-The candidate has uploaded their CV and it has been matched against job listings. Your role is to give specific, actionable advice to help them tailor their CV to the roles they want.
+CV (excerpt):
+${cvTextGlobal.substring(0, 2000)}
 
-CANDIDATE CV (first 3000 chars):
-${cvTextGlobal.substring(0, 3000)}
-
-TOP MATCHED JOBS:
+TOP MATCHES:
 ${top5}
 
-Guidelines — IMPORTANT:
-- Maximum 3 bullet points per response, one sentence each
-- No intro sentence, no closing summary — bullets only
-- Be specific: reference actual content from their CV
-- Suggest exact phrases or keywords to add, not vague advice
-- For follow-up questions: 2-3 sentences max, no bullets needed`;
+RULES — follow strictly:
+- Initial advice: exactly 3 bullets, one sentence each, no intro, no closing
+- Follow-up answers: 1–2 sentences only, no bullets
+- Never use phrases like "Great question" or "Happy to help"
+- Reference specific content from the CV or job titles above
+- Every suggestion must be concrete (exact keyword, phrase, or section name)`;
 }
 
 async function initCoach() {
@@ -1576,7 +1642,7 @@ async function initCoach() {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
+        max_tokens: 220,
         system: systemPrompt,
         messages: [{ role: 'user', content: initMsg }]
       })
@@ -1614,7 +1680,7 @@ async function coachSend() {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
+        max_tokens: 220,
         system: coachBuildSystemPrompt(),
         messages: coachHistory
       })
