@@ -278,7 +278,8 @@ def convert(csv_path: Path) -> dict:
                 "department":  department,
                 "location":    location,
                 "remote":      is_remote,
-                "posted":      parse_date_str(row.get("posted_date", "")),
+                "posted":      parse_date_str(row.get("posted_date", "")) or
+                               parse_date_str((row.get("scraped_at", "") or "")[:10]),
                 "closes":      parse_date_str(row.get("close_date", "")),
                 "type":        job_type,
                 "employment":  employment,

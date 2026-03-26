@@ -62,17 +62,36 @@ jobs:
 
       - name: Build jobs.json for the website
         working-directory: scrapers
+        run: python prepare_data.py
+
+      - name: Safety check — only deploy if scrape produced enough jobs
         run: |
-          python prepare_data.py
-          cp jobs.json ../jobs.json
+          NEW=$(python3 -c "import json; d=json.load(open('scrapers/jobs.json')); print(d['meta']['total'])")
+          OLD=$(python3 -c "import json; d=json.load(open('jobs.json')); print(d.get('meta',{}).get('total',0))" 2>/dev/null || echo 0)
+          echo "New scrape: $NEW jobs  |  Existing: $OLD jobs"
+          # Require at least 500 jobs AND no more than 50% drop vs existing data
+          if [ "$NEW" -lt 500 ]; then
+            echo "::warning::Scrape produced only $NEW jobs — too few to be reliable. Keeping existing data."
+            exit 1
+          fi
+          THRESHOLD=$(( OLD * 50 / 100 ))
+          if [ "$NEW" -lt "$THRESHOLD" ]; then
+            echo "::warning::New count ($NEW) is less than 50% of existing ($OLD). Keeping existing data."
+            exit 1
+          fi
+          cp scrapers/jobs.json jobs.json
+          echo "DEPLOY=true" >> $GITHUB_ENV
 
       - name: Install embedding dependencies
+        if: env.DEPLOY == 'true'
         run: pip install fastembed numpy
 
       - name: Generate job embeddings
+        if: env.DEPLOY == 'true'
         run: python generate_embeddings.py
 
       - name: Commit and push all updates
+        if: env.DEPLOY == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -80,7 +99,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes — skipping commit."
           else
-            TOTAL=$(python3 -c "import json; d=json.load(open('jobs.json')); print(d.get('total',0))")
+            TOTAL=$(python3 -c "import json; d=json.load(open('jobs.json')); print(d['meta']['total'])")
             git commit -m "Auto-update jobs data: ${TOTAL} listings [skip ci]"
             git push
           fi
