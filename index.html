@@ -890,18 +890,35 @@ function renderCard(job) {
     : `<a href="${viewHref}" target="_blank" rel="noopener" style="${btnP}">View Job ${extIcon}</a>
        <a href="${applyHref}" target="_blank" rel="noopener" style="${btnS}">Apply ${extIcon}</a>`;
 
+  const tag = salaryTag(job);
+
+  // Build an "≈ $X/yr" annotation when the sort value is inferred rather than
+  // directly readable from the salary string (hourly rates, mixed strings, etc.)
+  function inferredAnnualLabel(j) {
+    if (!j.salary) return '';
+    const n = parseSalaryNum(j);
+    if (n <= 0) return '';
+    const t = salaryTag(j);
+    // Already clearly annual — no annotation needed
+    if (t === '/yr') return '';
+    // Hourly or no tag but we derived a yearly number — show it
+    const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+    return `<span title="Estimated annual equivalent used for sorting" style="margin-left:6px;font-size:0.72rem;color:#6b7280;font-weight:400;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">≈ ${fmt}/yr</span>`;
+  }
+
+  const inferredLabel = inferredAnnualLabel(job);
+
   const detailMeta = [
     job.department ? esc(job.department) : '',
     job.location   ? esc(job.location)   : '',
     closes         ? closes              : '',
     job.salary
-      ? `<span style="color:#166534;font-weight:500;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${salaryTag(job)}</span></span>`
+      ? `<span style="color:#166534;font-weight:500;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${tag}</span>${inferredLabel}</span>`
       : `<span style="color:var(--text-3);font-size:0.78rem;">No salary information available</span>`,
   ].filter(Boolean).join('<span style="margin:0 8px;color:var(--border-strong);">·</span>');
 
-  const tag = salaryTag(job);
   const salaryLine = job.salary
-    ? `<div style="font-size:0.71rem;color:#166534;font-weight:500;margin-top:2px;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${tag}</span></div>`
+    ? `<div style="font-size:0.71rem;color:#166534;font-weight:500;margin-top:2px;">${esc(job.salary)}<span style="color:#6b7280;font-weight:400;margin-left:2px;">${tag}</span>${inferredLabel}</div>`
     : `<div style="font-size:0.71rem;color:var(--text-3);margin-top:2px;">No salary information available</div>`;
   // Mobile meta: institution · location · type · date on one line
   const mobMetaParts = [
