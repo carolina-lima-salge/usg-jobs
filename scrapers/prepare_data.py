@@ -112,6 +112,32 @@ def extract_salary_from_extra(extra_sections: str, existing_salary: str) -> str:
     return ""
 
 
+# Salary patterns that appear embedded inside description text (not labeled sections)
+_TEXT_SALARY_PAT = re.compile(
+    r'(?:salary\s*(?:range|:)\s*\$?\s*[\d,]+(?:\.\d+)?'         # "Salary: $53,000"
+    r'(?:\s*[-–]\s*\$?[\d,]+(?:\.\d+)?)?)'                       #  optional range
+    r'|(?:minimum\s+(?:hourly\s+rate|salary|monthly\s+salary)'   # "Minimum hourly rate $15"
+    r'\s+(?:is:?\s*)?\$?\s*[\d,]+(?:\.\d+)?(?:/\w+)?)'
+    r'|(?:\$\s*[\d,]+(?:\.\d+)?\s*'                              # "$25.00 per hour"
+    r'(?:per\s+(?:hour|month)|/hr|/hour))',
+    re.I
+)
+
+def extract_salary_from_text(*text_fields: str) -> str:
+    """
+    Last-resort salary extraction: scan free-text fields for inline salary mentions.
+    Only matches explicit patterns (e.g. 'Salary: $53,000', '$15.67 per hour') to
+    avoid false positives from grant amounts or enrollment figures.
+    """
+    for text in text_fields:
+        if not text:
+            continue
+        m = _TEXT_SALARY_PAT.search(text)
+        if m:
+            return m.group().strip()[:200]
+    return ""
+
+
 def extract_gastate_fields(dept_text: str) -> tuple[str, str]:
     """
     For GA State jobs the scraper embeds the full description in the department
@@ -215,11 +241,19 @@ def convert(csv_path: Path) -> dict:
             # "view" = direct job description page (posting_url preferred, no login wall)
             view_url  = posting_url or apply_url
 
-            # Salary — dedicated column → extra_sections → GA State dept blob
-            salary_raw  = extract_salary_from_extra(
-                clean(row.get("extra_sections", "")),
-                clean(row.get("salary", ""))
-            ) or gastate_salary
+            # Salary — dedicated column → extra_sections → GA State dept blob → text scan
+            salary_raw = (
+                extract_salary_from_extra(
+                    clean(row.get("extra_sections", "")),
+                    clean(row.get("salary", ""))
+                )
+                or gastate_salary
+                or extract_salary_from_text(
+                    clean(row.get("job_summary", "")),
+                    clean(row.get("other_information", "")),
+                    clean(row.get("responsibilities", "")),
+                )
+            )
             salary_type = detect_salary_type(salary_raw)
 
             # Full/Part-Time — dedicated column, or GA State dept blob fallback
