@@ -84,6 +84,12 @@
       font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em;
       text-transform: uppercase; color: var(--text-3);
     }
+    .tbl-col-label.sortable {
+      cursor: pointer; user-select: none;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .tbl-col-label.sortable:hover { color: var(--text-1); }
+    .tbl-col-label.sortable.sort-active { color: var(--accent); }
 
     /* Expanded detail */
     .row-detail {
@@ -421,6 +427,7 @@
       <!-- Sort -->
       <select id="f-sort" class="filter-select">
         <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
         <option value="salary-desc">Highest salary</option>
         <option value="salary-asc">Lowest salary</option>
       </select>
@@ -512,7 +519,9 @@
       <div class="tbl-col-label">Institution</div>
       <div class="tbl-col-label col-loc">Location</div>
       <div class="tbl-col-label col-type">Type</div>
-      <div class="tbl-col-label col-date">Posted</div>
+      <div class="tbl-col-label col-date sortable" id="col-sort-posted" onclick="togglePostedSort()" title="Sort by date posted">
+        Posted <span id="col-sort-arrow" style="font-size:0.75rem;">↕</span>
+      </div>
       <div class="tbl-col-label"></div>
     </div>
     <!-- Job rows -->
@@ -657,11 +666,15 @@ async function loadData() {
     const res = await fetch('jobs.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    // Drop jobs posted more than 6 months ago
+    // Drop jobs posted more than 6 months ago, or whose closing date has passed
     const sixMonthsAgo = new Date(Date.now() - 183 * 86400000);
+    const today = new Date(); today.setHours(0,0,0,0);
     allJobs = (data.jobs || []).filter(job => {
-      const d = parseDate(job.posted);
-      return !d || d >= sixMonthsAgo;  // keep if no date (unknown) or recent enough
+      const posted = parseDate(job.posted);
+      if (posted && posted < sixMonthsAgo) return false;  // too old
+      const closes = parseDate(job.closes);
+      if (closes && closes < today) return false;          // already closed
+      return true;
     });
 
     // Enrich GA State jobs: extract salary + type from the department text blob
@@ -826,9 +839,30 @@ function applyFilters() {
     });
   }
   // 'newest' is the default order from jobs.json (already sorted by date desc)
+  // For 'oldest', reverse the newest order
+  if (sort === 'oldest') {
+    filtered.sort((a, b) => dateOf(a) - dateOf(b));
+  }
+
+  // Update the Posted column header arrow + active state
+  const arrow = document.getElementById('col-sort-arrow');
+  const colEl = document.getElementById('col-sort-posted');
+  if (arrow && colEl) {
+    const isDate = sort === 'newest' || sort === 'oldest';
+    colEl.classList.toggle('sort-active', isDate);
+    arrow.textContent = sort === 'newest' ? '↓' : sort === 'oldest' ? '↑' : '↕';
+  }
 
   currentPage = 1;
   render();
+}
+
+// Toggle the Posted column between newest → oldest → newest
+function togglePostedSort() {
+  const sel = document.getElementById('f-sort');
+  sel.value = sel.value === 'newest' ? 'oldest' : 'newest';
+  currentPage = 1;
+  applyFilters();
 }
 
 // ── Render cards ───────────────────────────────────────────────────────────────
