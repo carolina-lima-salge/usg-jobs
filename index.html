@@ -421,8 +421,8 @@
       <!-- Sort -->
       <select id="f-sort" class="filter-select">
         <option value="newest">Newest first</option>
-        <option value="salary-desc">Salary ↓</option>
-        <option value="salary-asc">Salary ↑</option>
+        <option value="salary-desc">Highest salary</option>
+        <option value="salary-asc">Lowest salary</option>
       </select>
 
       <!-- Has salary checkbox -->
@@ -615,6 +615,11 @@ function closeAllMultiselectPanels() {
 document.addEventListener('click', closeAllMultiselectPanels);
 
 // ── Date utilities ─────────────────────────────────────────────────────────────
+function dateOf(job) {
+  const d = parseDate(job ? job.posted : null);
+  return d ? d.getTime() : 0;
+}
+
 function parseDate(s) {
   if (!s) return null;
   const d = new Date(s + 'T00:00:00');
@@ -804,18 +809,20 @@ function applyFilters() {
   } else if (sort === 'salary-desc') {
     filtered.sort((a, b) => {
       const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-      if (na === -1 && nb === -1) return 0;
+      if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);  // both unknown → newest first
       if (na === -1) return 1;   // no salary → bottom
       if (nb === -1) return -1;
-      return nb - na;
+      if (nb !== na) return nb - na;
+      return dateOf(b) - dateOf(a);  // tie → newest first
     });
   } else if (sort === 'salary-asc') {
     filtered.sort((a, b) => {
       const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-      if (na === -1 && nb === -1) return 0;
+      if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);  // both unknown → newest first
       if (na === -1) return 1;   // no salary → bottom
       if (nb === -1) return -1;
-      return na - nb;
+      if (na !== nb) return na - nb;
+      return dateOf(b) - dateOf(a);  // tie → newest first
     });
   }
   // 'newest' is the default order from jobs.json (already sorted by date desc)
