@@ -659,6 +659,24 @@ async function loadData() {
       return !d || d >= sixMonthsAgo;  // keep if no date (unknown) or recent enough
     });
 
+    // Enrich GA State jobs: extract salary + type from the department text blob
+    // (the scraper embeds full description there; pipeline strips it but salary/type survive)
+    allJobs.forEach(job => {
+      if (job.source !== 'Georgia State University') return;
+      const dept = job.department || '';
+      if (!job.salary) {
+        const m = dept.match(/(?:Salary\s*:|Anticipated Hiring Range\s*:)\s*\$?([\d,]+(?:\.\d+)?)\s*(?:\([^)]*\))?\s*[-–]\s*\$?([\d,]+(?:\.\d+)?)/i);
+        if (m) {
+          job.salary = '$' + m[1] + (m[2] ? ' - $' + m[2] : '');
+          job.salary_type = 'Annual';
+        }
+      }
+      if (!job.type) {
+        const t = dept.match(/Job Type\s*:\s*(Full[- ]?Time|Part[- ]?Time)/i);
+        if (t) job.type = t[1].replace(/[- ]+/g, '-');
+      }
+    });
+
     // Build institution multi-select
     buildMultiselect(
       'ms-inst-options', 'ms-inst-search', 'ms-inst-clear',

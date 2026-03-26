@@ -77,7 +77,12 @@ def is_garbled(s: str) -> bool:
         "- description:",
         "qualifications college/business unit",
     ]
-    return any(low.startswith(g) for g in garbled_starts)
+    if any(low.startswith(g) for g in garbled_starts):
+        return True
+    # GA State new format: "Job Title - 123456 Description: ..." (number + "description")
+    if re.search(r'\b\d{5,}\b.*\bdescription\b', low[:80], re.I):
+        return True
+    return False
 
 def extract_salary_from_extra(extra_sections: str, existing_salary: str) -> str:
     """
@@ -105,6 +110,34 @@ def extract_salary_from_extra(extra_sections: str, existing_salary: str) -> str:
         if any(label == sl or label.startswith(sl) for sl in salary_labels):
             return content[:200]
     return ""
+
+
+def extract_gastate_fields(dept_text: str) -> tuple[str, str]:
+    """
+    For GA State jobs the scraper embeds the full description in the department
+    field. Extract salary and job type from the text before it gets discarded.
+    Returns (salary_str, type_str) — either may be empty string.
+    """
+    salary = ""
+    job_type = ""
+
+    # Salary patterns: "Salary : $79,400 (minimum) - $103,200 (midpoint)"
+    #                  "Anticipated Hiring Range: $79,400- $103,200"
+    sal_pat = re.search(
+        r'(?:Salary\s*:|Anticipated Hiring Range\s*:)\s*\$?([\d,]+(?:\.\d+)?)'
+        r'(?:\s*\([^)]*\))?\s*[-–]\s*\$?([\d,]+(?:\.\d+)?)',
+        dept_text, re.I
+    )
+    if sal_pat:
+        lo, hi = sal_pat.group(1), sal_pat.group(2)
+        salary = f"${lo}" + (f" - ${hi}" if hi else "")
+
+    # Type pattern: "Job Type: Full Time (Benefits Eligible)"
+    type_pat = re.search(r'Job Type\s*:\s*(Full[- ]?Time|Part[- ]?Time)', dept_text, re.I)
+    if type_pat:
+        job_type = re.sub(r'[- ]+', '-', type_pat.group(1).strip())  # "Full-Time"
+
+    return salary, job_type
 
 
 def detect_salary_type(salary: str) -> str:
@@ -154,6 +187,10 @@ def convert(csv_path: Path) -> dict:
 
             # Department — skip if garbled (GA State scraper artefact: "- Description: ...")
             dept_raw = clean(row.get("department", ""))
+            # For GA State, extract salary + type from the blob before discarding it
+            gastate_salary, gastate_type = ("", "")
+            if source == "Georgia State University" and dept_raw:
+                gastate_salary, gastate_type = extract_gastate_fields(dept_raw)
             department = "" if is_garbled(dept_raw) else dept_raw
 
             # Resolve summary — keep as-is even if imperfect (GA State has navigation
@@ -178,17 +215,17 @@ def convert(csv_path: Path) -> dict:
             # "view" = direct job description page (posting_url preferred, no login wall)
             view_url  = posting_url or apply_url
 
-            # Salary — first try the dedicated column, then fall back to extra_sections
+            # Salary — dedicated column → extra_sections → GA State dept blob
             salary_raw  = extract_salary_from_extra(
                 clean(row.get("extra_sections", "")),
                 clean(row.get("salary", ""))
-            )
+            ) or gastate_salary
             salary_type = detect_salary_type(salary_raw)
 
-            # Full/Part-Time
+            # Full/Part-Time — dedicated column, or GA State dept blob fallback
             # UGA's employment_type = 'Employee' is not a full/part indicator — ignore it
             fpt_raw = clean(row.get("full_part_time", ""))
-            job_type = normalise_fpt(fpt_raw)
+            job_type = normalise_fpt(fpt_raw) or normalise_fpt(gastate_type)
 
             # Regular/Temporary
             rt_raw = clean(row.get("regular_temporary", ""))
