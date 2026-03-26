@@ -118,6 +118,7 @@ LABEL_MAP = {
     "additional schedule information":                          "schedule_info",
     "advertised salary":                                        "salary",
     "posting date":                                             "posting_date",
+    "job posting date":                                         "posting_date",
     "open until filled":                                        "open_until_filled",
     "closing date":                                             "close_date",
     "proposed starting date":                                   "proposed_start_date",
