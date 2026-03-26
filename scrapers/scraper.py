@@ -162,12 +162,81 @@ def get(session: requests.Session, url: str) -> requests.Response | None:
         return None
 
 
-# ── Phase 1: paginate listing pages ──────────────────────────────────────────
+# ── Phase 1: collect all job IDs via Atom feed (one request) ─────────────────
+#
+# UGA's PeopleAdmin exposes /postings/all_jobs.atom which returns every open
+# posting in a single Atom XML feed — much faster than paginating the HTML
+# search results page by page.  Falls back to HTML pagination if the feed
+# fails or returns no entries.
+
+NS = "{http://www.w3.org/2005/Atom}"
 
 def collect_listing_ids(session: requests.Session) -> list[dict]:
-    cards   = []
-    seen    = set()
-    page    = 1
+    cards = _collect_via_atom(session)
+    if cards:
+        return cards
+    print("  Atom feed empty or failed — falling back to HTML pagination")
+    return _collect_via_html(session)
+
+
+def _collect_via_atom(session: requests.Session) -> list[dict]:
+    """Fetch all posting IDs from the Atom feed in a single HTTP request."""
+    print(f"  Fetching Atom feed: {ATOM_URL}")
+    r = get(session, ATOM_URL)
+    if not r:
+        return []
+    try:
+        root = ET.fromstring(r.content)
+    except ET.ParseError as e:
+        print(f"  !! Atom XML parse error: {e}")
+        return []
+
+    cards = []
+    seen  = set()
+    for entry in root.findall(f"{NS}entry"):
+        # <id> = tag:ugajobsearch.com,2005:/postings/473770
+        id_tag = entry.findtext(f"{NS}id", "")
+        pid_m  = re.search(r"/postings/(\d+)", id_tag)
+        if not pid_m:
+            continue
+        pid = pid_m.group(1)
+        if pid in seen:
+            continue
+        seen.add(pid)
+
+        title = clean(entry.findtext(f"{NS}title", ""))
+        link  = ""
+        for lnk in entry.findall(f"{NS}link"):
+            if lnk.get("rel", "alternate") == "alternate":
+                link = lnk.get("href", "")
+                break
+        if not link:
+            link = urljoin(BASE, f"/postings/{pid}")
+
+        # published date lives in <updated> or <published>
+        pub = (entry.findtext(f"{NS}published", "") or
+               entry.findtext(f"{NS}updated",   ""))[:10]  # YYYY-MM-DD
+
+        cards.append({
+            "posting_id":     pid,
+            "posting_url":    link,
+            "working_title":  title,
+            "posting_number": "",   # filled from detail page
+            "department":     "",
+            "position_type":  "",
+            "close_date":     "",
+            "atom_published": pub,  # seed date; overwritten by detail page
+        })
+
+    print(f"  Atom feed: {len(cards)} postings found")
+    return cards
+
+
+def _collect_via_html(session: requests.Session) -> list[dict]:
+    """Fallback: paginate HTML search results to collect posting IDs."""
+    cards = []
+    seen  = set()
+    page  = 1
 
     while True:
         url = SEARCH_URL if page == 1 else f"{SEARCH_URL}?page={page}"
@@ -193,8 +262,6 @@ def collect_listing_ids(session: requests.Session) -> list[dict]:
             seen.add(pid)
             new += 1
 
-            # The listing row has 5 col-md-2 divs:
-            # [blank], posting_number, department, position_type, close_date
             cols = row.find_all("div", class_=re.compile(r"col-md-2"))
             def col(i): return clean(cols[i].get_text()) if len(cols) > i else ""
 
@@ -209,7 +276,6 @@ def collect_listing_ids(session: requests.Session) -> list[dict]:
             })
 
         print(f"    +{new} cards  (total: {len(cards)})")
-
         next_link = s.find("a", string=re.compile(r"^Next$", re.I))
         if not next_link or not new:
             break
@@ -224,7 +290,7 @@ def collect_listing_ids(session: requests.Session) -> list[dict]:
 def scrape_detail(session: requests.Session, card: dict, idx: int) -> dict:
     url = card["posting_url"]
 
-    # Seed with listing-level data
+    # Seed with listing-level data (atom_published is a fallback posting date)
     job = {k: "" for k in CSV_COLUMNS}
     job.update({
         "posting_url":    url,
@@ -233,6 +299,7 @@ def scrape_detail(session: requests.Session, card: dict, idx: int) -> dict:
         "posting_number": card.get("posting_number", ""),
         "department":     card.get("department", ""),
         "close_date":     card.get("close_date", ""),
+        "posting_date":   card.get("atom_published", ""),  # overwritten if detail has it
     })
 
     r = get(session, url)
