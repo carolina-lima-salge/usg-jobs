@@ -114,8 +114,12 @@ def extract_salary_from_extra(extra_sections: str, existing_salary: str) -> str:
 
 # Salary patterns that appear embedded inside description text (not labeled sections)
 _TEXT_SALARY_PAT = re.compile(
-    r'(?:salary\s*(?:range|:)\s*\$?\s*[\d,]+(?:\.\d+)?'         # "Salary: $53,000"
-    r'(?:\s*[-–]\s*\$?[\d,]+(?:\.\d+)?)?)'                       #  optional range
+    # "Salary Range: $71,813 - $97,665" or "Salary: $53,000" or "Salary range $X"
+    r'(?:salary\s*range\s*:?\s*\$?\s*[\d,]+(?:\.\d+)?'
+    r'(?:\s*[-–]\s*\$?[\d,]+(?:\.\d+)?)?'
+    r'(?:\s*(?:annually|per\s+year|/yr))?)'                       # optional unit word
+    r'|(?:salary\s*:\s*\$?\s*[\d,]+(?:\.\d+)?'
+    r'(?:\s*[-–]\s*\$?[\d,]+(?:\.\d+)?)?)'
     r'|(?:minimum\s+(?:hourly\s+rate|salary|monthly\s+salary)'   # "Minimum hourly rate $15"
     r'\s+(?:is:?\s*)?\$?\s*[\d,]+(?:\.\d+)?(?:/\w+)?)'
     r'|(?:\$\s*[\d,]+(?:\.\d+)?\s*'                              # "$25.00 per hour"
@@ -251,8 +255,9 @@ def convert(csv_path: Path) -> dict:
                 )
                 or gastate_salary
                 or extract_salary_from_text(
-                    clean(row.get("job_summary", "")),
                     clean(row.get("other_information", "")),
+                    clean(row.get("extra_sections", "")),
+                    clean(row.get("job_summary", "")),
                     clean(row.get("responsibilities", "")),
                 )
             )
