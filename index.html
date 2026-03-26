@@ -736,7 +736,15 @@ function parseSalaryNum(job) {
     // Pure hourly strings like "$18.27/hr" — annualise the hourly rate
     const hourlyRates = allNums.filter(n => n <= 500);
     if (hourlyRates.length) return Math.max(...hourlyRates) * 2080;
-    return -1;   // ambiguous (e.g. "$600/month") — exclude from sort
+    return -1;
+  }
+
+  if (tag === '/mo') {
+    // Monthly stipends like "$1,000 per month" — annualise × 12.
+    // Filter out noise (e.g. "$25 per semester" in the same string).
+    const monthly = allNums.filter(n => n >= 100 && n <= 15000);
+    if (monthly.length) return Math.max(...monthly) * 12;
+    return -1;
   }
 
   return Math.max(...allNums);
@@ -962,8 +970,10 @@ function renderCard(job) {
 function salaryTag(job) {
   const t = (job.salary_type || '').toLowerCase();
   const s = (job.salary || '').toLowerCase();
-  // Must be an explicit per-hour pay indicator — NOT just "business hours"
+  // Explicit hourly — must be unambiguous "per hour" wording
   if (/\bper\s+hour\b|\/hr\b|\/hour\b|\bhourly\b|\ban\s+hour\b/.test(s)) return '/hr';
+  // Explicit monthly — e.g. "$1,000 per month", "$1,000/month"
+  if (/\bper\s+month\b|\/month\b|\/mo\b/.test(s)) return '/mo';
   if (s.includes('/yr') || s.includes('annual')) return '/yr';
   // Magnitude check on the largest dollar amount found
   const nums = [...s.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
