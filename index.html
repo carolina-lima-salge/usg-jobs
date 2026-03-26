@@ -713,21 +713,33 @@ async function loadData() {
 function parseSalaryNum(job) {
   const salary = job ? (job.salary || '') : '';
   if (!salary) return -1;
-  // Extract all numeric amounts from strings like:
-  //   "$71,813.00 - $97,665.00"  →  use highest of range
-  //   "$18.27 / hr"              →  18.27  (then × 2080 to normalize)
-  //   "48,000"                   →  48000
-  const nums = [];
-  const re = /\$?\s*([\d,]+(?:\.\d+)?)/g;
-  let m;
-  while ((m = re.exec(salary)) !== null) {
-    const n = parseFloat(m[1].replace(/,/g, ''));
-    if (!isNaN(n) && n > 0) nums.push(n);
+
+  // Prefer dollar-signed numbers; fall back to plain 5-digit numbers (e.g. "48,000")
+  const dollarNums = [...salary.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
+    .map(m => parseFloat(m[1].replace(/,/g, ''))).filter(n => n > 0);
+
+  const allNums = dollarNums.length
+    ? dollarNums
+    : [...salary.matchAll(/\b([\d,]{5,}(?:\.\d+)?)\b/g)]
+        .map(m => parseFloat(m[1].replace(/,/g, '')))
+        .filter(n => n >= 10000 && n <= 600000);
+
+  if (!allNums.length) return -1;
+
+  const tag = salaryTag(job);
+  if (tag === '/hr') {
+    // Strings like "$27.91 per hour ($58,000)" contain BOTH the hourly rate AND
+    // the annual equivalent. If we see a large number (>$9,999) alongside the
+    // hourly indicator, that large number IS already the annual — use it directly.
+    const annuals = allNums.filter(n => n > 9999);
+    if (annuals.length) return Math.max(...annuals);
+    // Pure hourly strings like "$18.27/hr" — annualise the hourly rate
+    const hourlyRates = allNums.filter(n => n <= 500);
+    if (hourlyRates.length) return Math.max(...hourlyRates) * 2080;
+    return -1;   // ambiguous (e.g. "$600/month") — exclude from sort
   }
-  if (!nums.length) return -1;
-  const top = Math.max(...nums);
-  // Normalize hourly → annual so $25/hr ranks above $40,000/yr correctly
-  return salaryTag(job) === '/hr' ? top * 2080 : top;
+
+  return Math.max(...allNums);
 }
 
 // ── Filtering ──────────────────────────────────────────────────────────────────
@@ -933,16 +945,19 @@ function renderCard(job) {
 function salaryTag(job) {
   const t = (job.salary_type || '').toLowerCase();
   const s = (job.salary || '').toLowerCase();
-  // String clues always win
-  if (s.includes('hour') || s.includes('/hr')) return '/hr';
+  // Must be an explicit per-hour pay indicator — NOT just "business hours"
+  if (/\bper\s+hour\b|\/hr\b|\/hour\b|\bhourly\b|\ban\s+hour\b/.test(s)) return '/hr';
   if (s.includes('/yr') || s.includes('annual')) return '/yr';
-  // Magnitude check beats salary_type field (field sometimes mislabeled)
-  const num = parseFloat(s.replace(/[^0-9.]/g, ''));
-  if (!isNaN(num) && num > 0) {
-    if (num < 1000) return '/hr';   // $14, $25.50, etc. — always hourly
-    if (num > 8000) return '/yr';   // $45,000+  — always annual
+  // Magnitude check on the largest dollar amount found
+  const nums = [...s.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
+    .map(m => parseFloat(m[1].replace(/,/g, '')))
+    .filter(n => n > 0);
+  if (nums.length) {
+    const top = Math.max(...nums);
+    if (top < 1000) return '/hr';   // $14, $25.50 — always hourly
+    if (top > 8000) return '/yr';   // $45,000+   — always annual
   }
-  // Fall back to explicit field for ambiguous mid-range numbers
+  // Fall back to explicit field for ambiguous mid-range
   if (t === 'hourly') return '/hr';
   if (t === 'annual') return '/yr';
   return '';

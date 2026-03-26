@@ -171,12 +171,14 @@ def detect_salary_type(salary: str) -> str:
     s = salary.lower()
     if not s:
         return ""
-    hourly_patterns = ["/hr", "per hour", "/hour", " hourly", "an hour", "$/hr"]
-    for pat in hourly_patterns:
-        if pat in s:
-            return "Hourly"
-    # Has digits/dollar signs → likely annual (if no hourly indicator found)
-    if re.search(r'[\$\d]', s):
+    # Must be explicit per-hour pay indicator — NOT just "business hours"
+    if re.search(r'\bper\s+hour\b|/hr\b|/hour\b|\bhourly\b|\ban\s+hour\b', s):
+        return "Hourly"
+    # Has dollar amounts → likely annual
+    if re.search(r'\$\s*[\d,]+', s):
+        return "Annual"
+    # Plain number in annual range
+    if re.search(r'\b\d{5,}\b', s):
         return "Annual"
     return ""
 
