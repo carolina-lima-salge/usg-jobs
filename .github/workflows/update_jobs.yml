@@ -11,7 +11,7 @@ on:
 jobs:
   update-jobs:
     runs-on: ubuntu-latest
-    timeout-minutes: 90   # kill the job if it runs over 90 min (prevents runaway scrapes)
+    timeout-minutes: 360  # allow up to 6 hours (OneHCM alone takes 3+ hours)
     permissions:
       contents: write   # needed to commit and push
 
@@ -53,7 +53,7 @@ jobs:
       - name: Run USG OneHCM scraper (23 institutions)
         working-directory: scrapers
         run: python scraper_onehcm.py
-        timeout-minutes: 60   # largest scraper — cap at 60 min
+        timeout-minutes: 300  # up to 5 hours for 23 institutions + detail fetching
         continue-on-error: true
 
       - name: Merge all scrapers into usg_all_jobs.csv
