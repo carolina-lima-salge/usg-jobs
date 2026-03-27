@@ -147,6 +147,151 @@ LABEL_MAP = {
     "recruitment contact phone":                                "contact_phone",
 }
 
+# ── Fuzzy label patterns ───────────────────────────────────────────────────────
+# Ordered list of (compiled_regex, csv_field).  Used as a fallback when the
+# exact LABEL_MAP lookup misses — catches label variations like
+# "Job Posting Date" vs "Posting Date" vs "Date Posted", etc.
+# Each regex is matched against the cleaned, lowercased, colon-stripped label.
+_LABEL_PATTERNS: list[tuple] = [
+    # Posting date
+    (re.compile(r'(?:job\s+)?posting\s+date|date\s+(?:of\s+)?post(?:ed|ing)|'
+                r'position\s+post(?:ed|ing)\s+date|date\s+posted', re.I),
+     "posting_date"),
+    # Close / deadline
+    (re.compile(r'clos(?:e|ing)\s+date|application\s+(?:deadline|close(?:\s+date)?)|'
+                r'\bdeadline\b|closes\s+(?:on\b|date)', re.I),
+     "close_date"),
+    # Salary / pay / compensation / wage
+    (re.compile(r'advertised\s+salary|salary(?:\s+range)?|pay\s+(?:rate|range|grade|scale)|'
+                r'compensation(?:\s+range)?|\bwage(?:s)?\b', re.I),
+     "salary"),
+    # Proposed start date
+    (re.compile(r'proposed\s+start(?:ing)?\s+date|expected\s+start(?:\s+date)?|'
+                r'anticipated\s+start(?:\s+date)?|start\s+date', re.I),
+     "proposed_start_date"),
+    # Open until filled
+    (re.compile(r'open\s+until\s+fill(?:ed)?', re.I),
+     "open_until_filled"),
+    # Posting type
+    (re.compile(r'^posting\s+type$|^position\s+type$|^job\s+type$', re.I),
+     "posting_type"),
+    # Posting number / ID
+    (re.compile(r'posting\s+(?:number|#|no\.?|id)\b', re.I),
+     "posting_number"),
+    # Working title
+    (re.compile(r'(?:working|job|position)\s+title|title\s+of\s+(?:the\s+)?position', re.I),
+     "working_title"),
+    # Department  ("dept" OR "department" — share "dep" prefix but diverge at 4th char)
+    (re.compile(r'^dep(?:t|artment)(?:\s+name)?$', re.I),
+     "department"),
+    # About department
+    (re.compile(r'about\s+the\s+(?:college|unit|department|dept)|'
+                r'college[/\s]+unit[/\s]+department', re.I),
+     "about_department"),
+    # Department website
+    (re.compile(r'(?:college|unit|dept|department)\s+(?:web\s*site|url|link)', re.I),
+     "department_website"),
+    # Employment type
+    (re.compile(r'employment\s+type|type\s+of\s+(?:employment|position)', re.I),
+     "employment_type"),
+    # Retirement plan
+    (re.compile(r'retirement\s+plan', re.I),
+     "retirement_plan"),
+    # Benefits eligibility
+    (re.compile(r'benefits?\s+eligib', re.I),
+     "benefits_eligibility"),
+    # Full / part time — matches "full/part time", "Full Time / Part Time", "Full-Time/Part-Time"
+    (re.compile(r'full[\s\-]*time[\s/\-]+part[\s\-]*time|'
+                r'full[/\s\-]+part[/\s\-]+time|'
+                r'employment\s+(?:status|basis)\b', re.I),
+     "full_part_time"),
+    # Work schedule
+    (re.compile(r'work\s+schedule|hours?\s+(?:per\s+week|schedule)|schedule\s+type', re.I),
+     "work_schedule"),
+    # Additional schedule info
+    (re.compile(r'additional\s+schedule|schedule\s+information', re.I),
+     "schedule_info"),
+    # Location
+    (re.compile(r'location\s+of\s+vacanc|vacanc[y]\s+location|'
+                r'work(?:ing)?\s+location|job\s+location|^location$', re.I),
+     "location"),
+    # Classification title
+    (re.compile(r'classification\s+title|job\s+class(?:ification)?', re.I),
+     "classification_title"),
+    # FLSA
+    (re.compile(r'^flsa(?:\s+status)?$', re.I),
+     "flsa"),
+    # FTE
+    (re.compile(r'^fte(?:\s*[:\-].*)?$', re.I),
+     "fte"),
+    # Minimum qualifications
+    (re.compile(r'minimum\s+(?:qualifications?|requirements?)|'
+                r'required\s+qualifications?|minimum\s+education', re.I),
+     "minimum_qualifications"),
+    # Preferred qualifications
+    (re.compile(r'preferred\s+(?:qualifications?|requirements?|experience)', re.I),
+     "preferred_qualifications"),
+    # Position summary / description
+    (re.compile(r'position\s+summary|job\s+summary|position\s+description|'
+                r'job\s+description|role\s+summary', re.I),
+     "position_summary"),
+    # Knowledge, skills, abilities
+    (re.compile(r'knowledge[,\s]+skills?[,\s&/]+abilit|ksa\b', re.I),
+     "knowledge_skills_abilities"),
+    # Physical demands
+    (re.compile(r'physical\s+(?:demands?|requirements?|effort)', re.I),
+     "physical_demands"),
+    # Special instructions
+    (re.compile(r'special\s+instructions?(?:\s+to\s+applicants?)?', re.I),
+     "special_instructions"),
+    # Driving
+    (re.compile(r'driv(?:ing|e)\s+(?:a\s+)?responsibilit', re.I),
+     "driving_required"),
+    # Position of trust
+    (re.compile(r'position\s+of\s+trust', re.I),
+     "position_of_trust"),
+    # Financial responsibility
+    (re.compile(r'financial\s+resource|operation.*access.*financial|'
+                r'financial\s+responsibilit', re.I),
+     "financial_responsibility"),
+    # P-card
+    (re.compile(r'p[\s\-]?card', re.I),
+     "p_card_required"),
+    # Children / patient interaction
+    (re.compile(r'direct\s+(?:interaction|care).*child|child.*direct\s+(?:interaction|care)|'
+                r'direct\s+patient\s+care', re.I),
+     "children_interaction"),
+    # Security access
+    (re.compile(r'security\s+access|public\s+safety.*it\s+security|'
+                r'personnel\s+records|access\s+to\s+chemicals', re.I),
+     "security_access"),
+    # Contact name / email / phone  (order matters — name before email/phone)
+    (re.compile(r'(?:recruitment\s+)?contact\s+(?:person\s+)?(?:name|person)(?!\s+(?:email|phone))',
+                re.I),
+     "contact_name"),
+    (re.compile(r'(?:recruitment\s+)?contact\s+e?[-\s]?mail', re.I),
+     "contact_email"),
+    (re.compile(r'(?:recruitment\s+)?contact\s+(?:phone|telephone|tel\.?\b)', re.I),
+     "contact_phone"),
+]
+
+
+def resolve_label(label: str):
+    """Map a cleaned, lowercased, colon-stripped <th> label to a CSV column.
+
+    Tries exact LABEL_MAP first (O(1), preserves all existing behaviour),
+    then falls through to _LABEL_PATTERNS for fuzzy / variant matching.
+    Returns None if no match.
+    """
+    # 1. Exact lookup — fastest path, covers every known label
+    if label in LABEL_MAP:
+        return LABEL_MAP[label]
+    # 2. Regex patterns — handles variants, typos, extra words
+    for pat, field in _LABEL_PATTERNS:
+        if pat.search(label):
+            return field
+    return None
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -341,8 +486,8 @@ def scrape_detail(session: requests.Session, card: dict, idx: int) -> dict:
                 duties_list[-1] += f"  [{value}% of time]"
             continue
 
-        # Map label → field
-        field = LABEL_MAP.get(label)
+        # Map label → field (exact first, then regex fallback)
+        field = resolve_label(label)
         if field and not job.get(field):
             job[field] = value
 
@@ -364,7 +509,12 @@ def scrape_detail(session: requests.Session, card: dict, idx: int) -> dict:
 # ── Incremental helpers ───────────────────────────────────────────────────────
 
 def _load_existing_jobs(csv_path: str) -> dict:
-    """Load all existing rows from uga_jobs.csv keyed by posting_number."""
+    """Load all existing rows from uga_jobs.csv keyed by posting_number AND posting_url.
+
+    Two keys per row so we can dedup both HTML-fallback cards (which carry a
+    posting_number from the listing page) AND Atom-feed cards (which have an
+    empty posting_number but a valid posting_url).
+    """
     if FULL_REFRESH:
         return {}
     p = Path(csv_path)
@@ -375,8 +525,11 @@ def _load_existing_jobs(csv_path: str) -> dict:
         with open(p, newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 pid = row.get("posting_number", "").strip()
+                url = row.get("posting_url",    "").strip()
                 if pid:
                     existing[pid] = row
+                if url:
+                    existing[url] = row   # secondary key — used for Atom-feed dedup
     except Exception:
         pass
     return existing
@@ -404,10 +557,25 @@ def scrape() -> list[dict]:
     cards = collect_listing_ids(session)
     if not cards:
         print("No listings found.")
-        return list(existing_jobs.values())
+        # Deduplicate existing_jobs.values(): dual-keyed dict means same row
+        # appears under both posting_number key AND posting_url key.
+        seen_keys: set = set()
+        result = []
+        for job in existing_jobs.values():
+            k = job.get("posting_number", "").strip() or job.get("posting_url", "").strip()
+            if k and k not in seen_keys:
+                seen_keys.add(k)
+                result.append(job)
+        return result
 
-    # Filter to only new posting numbers
-    new_cards = [c for c in cards if c.get("posting_number", "") not in existing_jobs]
+    # Filter to only cards we haven't already scraped.
+    # Check BOTH posting_number (HTML cards) AND posting_url (Atom feed cards,
+    # which always have posting_number="" so the number check alone never filters them).
+    new_cards = [
+        c for c in cards
+        if (c.get("posting_number", "").strip() not in existing_jobs
+            and c.get("posting_url",    "").strip() not in existing_jobs)
+    ]
     skipped   = len(cards) - len(new_cards)
     print(f"\nTotal listings: {len(cards)}  |  New: {len(new_cards)}  |  Skipped (already have): {skipped}")
 
@@ -432,14 +600,30 @@ def scrape() -> list[dict]:
 
         time.sleep(DETAIL_DELAY)
 
-    # Merge: existing jobs + newly fetched (new takes precedence on ID collision)
-    merged = {**existing_jobs}
+    # Merge: new jobs take precedence; existing fill in the rest.
+    # NOTE: existing_jobs is dual-keyed (posting_number + posting_url → same row).
+    # We cannot simply do {**existing_jobs} because that would include each row
+    # under two keys, causing list(merged.values()) to yield duplicates.
+    # Instead, build merged with one canonical key per job.
+    merged: dict = {}
+
     for job in new_jobs:
         pid = job.get("posting_number", "").strip()
-        if pid:
-            merged[pid] = job
+        url = job.get("posting_url",    "").strip()
+        key = pid or url
+        if key:
+            merged[key] = job
 
-    print(f"\nTotal after merge: {len(merged)} jobs  ({len(new_jobs)} new + {len(existing_jobs)} existing)")
+    carried_over = 0
+    for job in existing_jobs.values():
+        pid = job.get("posting_number", "").strip()
+        url = job.get("posting_url",    "").strip()
+        key = pid or url
+        if key and key not in merged:
+            merged[key] = job
+            carried_over += 1
+
+    print(f"\nTotal after merge: {len(merged)} jobs  ({len(new_jobs)} new + {carried_over} existing)")
     return list(merged.values())
 
 
@@ -488,7 +672,7 @@ def test_parse():
             if duties_list:
                 duties_list[-1] += f"  [{value}% of time]"
             continue
-        field = LABEL_MAP.get(label)
+        field = resolve_label(label)
         if field and not job.get(field):
             job[field] = value
     if duties_list:

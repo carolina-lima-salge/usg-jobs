@@ -26,7 +26,7 @@ Master columns
   full_part_time           Full-Time / Part-Time (when available)
   regular_temporary        Regular / Temporary (when available)
   employment_type          employee vs student/graduate (UGA)
-  salary                   pay info (UGA only)
+  salary                   pay / salary info (when available from any source)
   about_us                 about the institution or department
   job_summary              position overview / summary
   responsibilities         duties and responsibilities
@@ -136,7 +136,7 @@ def _map_gatech(row: dict) -> dict:
         "full_part_time":           _clean(row.get("full_part_time")),
         "regular_temporary":        _clean(row.get("regular_temporary")),
         "employment_type":          "",
-        "salary":                   "",
+        "salary":                   _clean(row.get("salary", "")),
         "about_us":                 _clean(row.get("about_us")),
         "job_summary":              _clean(row.get("job_summary")),
         "responsibilities":         _clean(row.get("responsibilities")),
@@ -166,7 +166,7 @@ def _map_onehcm(row: dict) -> dict:
         "full_part_time":           _clean(row.get("full_part_time")),
         "regular_temporary":        _clean(row.get("regular_temporary")),
         "employment_type":          "",
-        "salary":                   "",
+        "salary":                   _clean(row.get("salary", "")),
         "about_us":                 _clean(row.get("about_us")),
         "job_summary":              _clean(row.get("job_summary")),
         "responsibilities":         _clean(row.get("responsibilities")),
@@ -196,7 +196,7 @@ def _map_gastate(row: dict) -> dict:
         "full_part_time":           _clean(row.get("full_part_time")),
         "regular_temporary":        _clean(row.get("regular_temporary")),
         "employment_type":          "",
-        "salary":                   "",
+        "salary":                   _clean(row.get("salary", "")),
         "about_us":                 _clean(row.get("about_us")),
         "job_summary":              _clean(row.get("job_summary")),
         "responsibilities":         _clean(row.get("responsibilities")),

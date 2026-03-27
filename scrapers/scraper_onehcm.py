@@ -115,6 +115,42 @@ SECTION_MAP = {
 }
 SKIP_SECTIONS = {"location", "usg core values", "equal employment opportunity"}
 
+# ─── Fuzzy section-label patterns ─────────────────────────────────────────────
+# Fallback when SECTION_MAP exact lookup misses — catches label variations used
+# by different USG institutions on the same OneHCM portal.
+_SECTION_PATTERNS: list[tuple] = [
+    (re.compile(r'(?:job|role|position)\s+(?:summary|description|overview)|'
+                r'^overview$|^description$|^summary$', re.I),                   "job_summary"),
+    (re.compile(r'(?:essential\s+)?(?:duties|responsibilities|functions)|'
+                r'key\s+responsibilities|primary\s+duties', re.I),              "responsibilities"),
+    (re.compile(r'(?:minimum|required)\s+(?:qualifications?|requirements?)|'
+                r'^qualifications?$|^requirements?$', re.I),                    "required_qualifications"),
+    (re.compile(r'preferred\s+(?:qualifications?|requirements?|experience)',
+                re.I),                                                           "preferred_qualifications"),
+    (re.compile(r'knowledge[,\s]+skills?[,\s&/]+abilit|ksa\b', re.I),          "knowledge_skills_abilities"),
+    (re.compile(r'about\s+(?:us|the\s+(?:university|institution|department|'
+                r'college|unit|school))', re.I),                                "about_us"),
+    # Salary / pay / compensation — catches any label mentioning pay or salary
+    (re.compile(r'salary(?:\s+range)?|advertised\s+salary|proposed\s+salary|'
+                r'pay\s+(?:rate|range|grade|scale)|compensation(?:\s+range)?|'
+                r'wage(?:s)?\b|shift/salary', re.I),                            "salary"),
+    (re.compile(r'background\s+(?:check|investigation|screening)', re.I),       "background_check"),
+    (re.compile(r'other\s+information|additional\s+information|'
+                r'^benefits?$|supplemental\s+information', re.I),               "other_information"),
+]
+
+
+def resolve_section(raw_label: str):
+    """Map a section label to a CSV column.  Exact SECTION_MAP first, then regex."""
+    key = raw_label.strip().lower()
+    if key in SECTION_MAP:
+        return SECTION_MAP[key]
+    for pat, field in _SECTION_PATTERNS:
+        if pat.search(key):
+            return field
+    return None
+
+
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def clean(v) -> str:
@@ -183,7 +219,7 @@ def parse_detail(html: str, job_id: str, card: dict) -> dict:
         cnt_el  = soup.find("span", id=f"HRS_SCH_PSTDSC_DESCRLONG${i}")
         content = clean(cnt_el.get_text(separator=" ")) if cnt_el else ""
         if not content or lbl_key in SKIP_SECTIONS: continue
-        col = SECTION_MAP.get(lbl_key)
+        col = resolve_section(lbl_key)
         if col:
             job[col] = content
         else:
@@ -219,8 +255,12 @@ def scroll_to_load_all(page, expected_count: int, inst_name: str) -> list[dict]:
         return added
 
     # Initial harvest
-    harvest(BeautifulSoup(page.content(), "lxml"))
-    print(f"    Initial rows: {len(all_rows)} / {expected_count}", flush=True)
+    try:
+        harvest(BeautifulSoup(page.content(), "lxml"))
+        print(f"    Initial rows: {len(all_rows)} / {expected_count}", flush=True)
+    except Exception as exc:
+        print(f"    ⚠ Initial page.content() failed ({exc}); returning empty.", flush=True)
+        return all_rows
 
     # NOTE: do NOT early-exit here even if initial count >= expected.
     # The DOM may still contain stale rows from the previous institution;
@@ -229,7 +269,10 @@ def scroll_to_load_all(page, expected_count: int, inst_name: str) -> list[dict]:
     # Find grid bounding box to position the mouse over it
     grid_box = None
     for sel in GRID_SEL.split(", "):
-        locs = page.locator(sel.strip()).all()
+        try:
+            locs = page.locator(sel.strip()).all()
+        except Exception:
+            locs = []
         if locs:
             try:
                 grid_box = locs[0].bounding_box()
@@ -246,7 +289,10 @@ def scroll_to_load_all(page, expected_count: int, inst_name: str) -> list[dict]:
 
     cx = grid_box["x"] + grid_box["width"] / 2
     cy = grid_box["y"] + grid_box["height"] / 2
-    page.mouse.move(cx, cy)
+    try:
+        page.mouse.move(cx, cy)
+    except Exception:
+        pass  # mouse positioning is best-effort
 
     stall_count = 0
     for attempt in range(MAX_SCROLL_ATTEMPTS):
@@ -261,10 +307,15 @@ def scroll_to_load_all(page, expected_count: int, inst_name: str) -> list[dict]:
             pass
 
         # Also fire wheel events over the grid
-        page.mouse.wheel(0, 600)
-        page.wait_for_timeout(int(SCROLL_PAUSE * 1000))
-
-        added = harvest(BeautifulSoup(page.content(), "lxml"))
+        try:
+            page.mouse.wheel(0, 600)
+            page.wait_for_timeout(int(SCROLL_PAUSE * 1000))
+            added = harvest(BeautifulSoup(page.content(), "lxml"))
+        except Exception as exc:
+            print(f"    ⚠ Scroll interrupted ({exc}); "
+                  f"keeping {len(all_rows)} / {expected_count} rows collected so far.",
+                  flush=True)
+            break
         print(f"    Scroll {attempt+1}: +{added} rows  →  total {len(all_rows)} / {expected_count}",
               flush=True)
 
@@ -330,7 +381,11 @@ def _discover_institutions(page) -> list[dict]:
     # Expand 'More' facet sections so all institution labels are in the DOM
     _expand_more_filters(page)
 
-    soup = BeautifulSoup(page.content(), "lxml")
+    try:
+        soup = BeautifulSoup(page.content(), "lxml")
+    except Exception as exc:
+        print(f"  ⚠ _discover_institutions: page.content() failed ({exc}).", flush=True)
+        return []
     institutions = []
     i = 0
     while True:
@@ -389,6 +444,8 @@ def collect_all_jobs_by_institution(page) -> list[dict]:
 
     print()
 
+    consecutive_failures = 0
+
     for inst in institutions:
         idx   = inst["idx"]
         name  = inst["name"]
@@ -396,93 +453,126 @@ def collect_all_jobs_by_institution(page) -> list[dict]:
 
         print(f"\n── {name}  ({count} jobs) ──────────────────")
 
-        # Click the institution filter checkbox
-        clicked = False
-        for ctrl_sel in [
-            f"#win0divPTS_SELECTctrl\\${idx}",
-            f"#PTS_SELECT\\${idx}",
-            f"label[id='PTS_SELECT_LBL\\${idx}']",
-        ]:
-            try:
-                ctrl = page.locator(ctrl_sel).first
-                if ctrl.count() > 0 and ctrl.is_visible():
-                    ctrl.click()
+        try:
+            # Click the institution filter checkbox
+            clicked = False
+            for ctrl_sel in [
+                f"#win0divPTS_SELECTctrl\\${idx}",
+                f"#PTS_SELECT\\${idx}",
+                f"label[id='PTS_SELECT_LBL\\${idx}']",
+            ]:
+                try:
+                    ctrl = page.locator(ctrl_sel).first
+                    if ctrl.count() > 0 and ctrl.is_visible():
+                        ctrl.click()
+                        clicked = True
+                        break
+                except Exception:
+                    pass
+            if not clicked:
+                try:
+                    page.evaluate(
+                        f"doRadioOuterClick(document.getElementById('PTS_SELECT${idx}'))"
+                    )
                     clicked = True
-                    break
+                except Exception as e:
+                    print(f"  Filter click failed for all methods: {e} — skipping",
+                          flush=True)
+                    consecutive_failures += 1
+                    continue
+
+            # ── Wait for PeopleSoft AJAX filter to complete ──────────────────────
+            # Step 1: wait for the overlay to appear (AJAX started)
+            try:
+                page.wait_for_function(
+                    """() => {
+                        const w = document.getElementById('WAIT_win0');
+                        return w && w.style.display !== 'none' && w.style.visibility !== 'hidden';
+                    }""",
+                    timeout=5_000
+                )
+            except Exception:
+                pass  # overlay too fast to catch — that's OK
+
+            # Step 2: wait for the overlay to disappear (AJAX complete)
+            try:
+                page.wait_for_function(
+                    """() => {
+                        const w = document.getElementById('WAIT_win0');
+                        const p = document.getElementById('processing');
+                        const wOk = !w || w.style.display === 'none' || w.style.visibility === 'hidden';
+                        const pOk = !p || p.style.display === 'none' || p.style.visibility === 'hidden';
+                        return wOk && pOk;
+                    }""",
+                    timeout=30_000
+                )
+            except Exception:
+                try:
+                    page.wait_for_timeout(3000)
+                except Exception:
+                    pass
+
+            # Step 3: confirm job rows are in the DOM
+            try:
+                page.wait_for_selector('span[id^="SCH_JOB_TITLE"]', timeout=15_000)
             except Exception:
                 pass
-        if not clicked:
             try:
-                page.evaluate(
-                    f"doRadioOuterClick(document.getElementById('PTS_SELECT${idx}'))"
+                page.wait_for_timeout(1000)
+            except Exception:
+                pass
+
+            # Scroll to load all rows for this institution
+            inst_rows = scroll_to_load_all(page, count, name)
+
+            # Merge into global list (dedup)
+            added = 0
+            for r in inst_rows:
+                if r["job_id"] and r["job_id"] not in seen_ids:
+                    seen_ids.add(r["job_id"])
+                    all_jobs.append(r)
+                    added += 1
+            print(f"  Collected {added} new jobs  |  Running total: {len(all_jobs)}",
+                  flush=True)
+
+            # Clear the filter: reload the search page fresh so facets reset cleanly
+            for _nav_attempt in range(3):
+                try:
+                    page.goto(SEARCH_URL, wait_until="load", timeout=90_000)
+                    break
+                except Exception as exc:
+                    print(f"  ⚠ page.goto failed ({exc}); retrying…", flush=True)
+                    try:
+                        page.wait_for_timeout(3000)
+                    except Exception:
+                        pass
+            try:
+                page.wait_for_selector(
+                    'label[id^="PTS_SELECT_LBL"], span[id^="SCH_JOB_TITLE"]',
+                    timeout=30_000
                 )
-                clicked = True
-            except Exception as e:
-                print(f"  Filter click failed for all methods: {e} — skipping")
-                continue
+            except Exception:
+                pass
+            try:
+                page.wait_for_timeout(1000)
+            except Exception:
+                pass
+            try:
+                _expand_more_filters(page)
+            except Exception:
+                pass
 
-        # ── Wait for PeopleSoft AJAX filter to complete ──────────────────────
-        # Filter clicks are XHR (no navigation), so wait_for_load_state is useless.
-        # PeopleSoft shows #WAIT_win0 during AJAX and hides it on completion.
-        # Step 1: wait for the overlay to appear (AJAX started)
-        try:
-            page.wait_for_function(
-                """() => {
-                    const w = document.getElementById('WAIT_win0');
-                    return w && w.style.display !== 'none' && w.style.visibility !== 'hidden';
-                }""",
-                timeout=5_000
-            )
-        except Exception:
-            pass  # overlay too fast to catch — that's OK
+        except Exception as exc:
+            consecutive_failures += 1
+            print(f"  ⚠ {name}: unexpected error ({exc}); skipping. "
+                  f"[{consecutive_failures} consecutive failure(s)]", flush=True)
+            if consecutive_failures >= 3:
+                print("  ✖ 3 consecutive failures — Playwright session likely dead; "
+                      "stopping.", flush=True)
+                break
+            continue
 
-        # Step 2: wait for the overlay to disappear (AJAX complete)
-        try:
-            page.wait_for_function(
-                """() => {
-                    const w = document.getElementById('WAIT_win0');
-                    const p = document.getElementById('processing');
-                    const wOk = !w || w.style.display === 'none' || w.style.visibility === 'hidden';
-                    const pOk = !p || p.style.display === 'none' || p.style.visibility === 'hidden';
-                    return wOk && pOk;
-                }""",
-                timeout=30_000
-            )
-        except Exception:
-            page.wait_for_timeout(3000)
-
-        # Step 3: confirm job rows are in the DOM
-        try:
-            page.wait_for_selector('span[id^="SCH_JOB_TITLE"]', timeout=15_000)
-        except Exception:
-            pass
-        page.wait_for_timeout(1000)
-
-        # Scroll to load all rows for this institution
-        inst_rows = scroll_to_load_all(page, count, name)
-
-        # Merge into global list (dedup)
-        added = 0
-        for r in inst_rows:
-            if r["job_id"] and r["job_id"] not in seen_ids:
-                seen_ids.add(r["job_id"])
-                all_jobs.append(r)
-                added += 1
-        print(f"  Collected {added} new jobs  |  Running total: {len(all_jobs)}")
-
-        # Clear the filter: reload the search page fresh so facets reset cleanly
-        page.goto(SEARCH_URL, wait_until="load", timeout=90_000)
-        try:
-            page.wait_for_selector(
-                'label[id^="PTS_SELECT_LBL"], span[id^="SCH_JOB_TITLE"]',
-                timeout=30_000
-            )
-        except Exception:
-            pass
-        page.wait_for_timeout(1000)
-        # Re-expand "More" so ALL institution filter checkboxes (indices 10+)
-        # are back in the DOM — the page collapses the facet list on every reload.
-        _expand_more_filters(page)
+        consecutive_failures = 0
 
     return all_jobs
 

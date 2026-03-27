@@ -130,6 +130,41 @@ SECTION_MAP = {
 }
 SKIP_SECTIONS = {"location", "usg core values", "equal employment opportunity"}
 
+# ─── Fuzzy section-label patterns ─────────────────────────────────────────────
+# Identical pattern list to scraper_onehcm.py — same OneHCM portal, same variants.
+_SECTION_PATTERNS: list[tuple] = [
+    (re.compile(r'(?:job|role|position)\s+(?:summary|description|overview)|'
+                r'^overview$|^description$|^summary$', re.I),                   "job_summary"),
+    (re.compile(r'(?:essential\s+)?(?:duties|responsibilities|functions)|'
+                r'key\s+responsibilities|primary\s+duties', re.I),              "responsibilities"),
+    (re.compile(r'(?:minimum|required)\s+(?:qualifications?|requirements?)|'
+                r'^qualifications?$|^requirements?$', re.I),                    "required_qualifications"),
+    (re.compile(r'preferred\s+(?:qualifications?|requirements?|experience)',
+                re.I),                                                           "preferred_qualifications"),
+    (re.compile(r'knowledge[,\s]+skills?[,\s&/]+abilit|ksa\b', re.I),          "knowledge_skills_abilities"),
+    (re.compile(r'about\s+(?:us|the\s+(?:university|institution|department|'
+                r'college|unit|school))', re.I),                                "about_us"),
+    # Salary / pay / compensation
+    (re.compile(r'salary(?:\s+range)?|advertised\s+salary|proposed\s+salary|'
+                r'pay\s+(?:rate|range|grade|scale)|compensation(?:\s+range)?|'
+                r'wage(?:s)?\b|shift/salary', re.I),                            "salary"),
+    (re.compile(r'background\s+(?:check|investigation|screening)', re.I),       "background_check"),
+    (re.compile(r'other\s+information|additional\s+information|'
+                r'^benefits?$|supplemental\s+information', re.I),               "other_information"),
+]
+
+
+def resolve_section(raw_label: str):
+    """Map a section label to a CSV column.  Exact SECTION_MAP first, then regex."""
+    key = raw_label.strip().lower()
+    if key in SECTION_MAP:
+        return SECTION_MAP[key]
+    for pat, field in _SECTION_PATTERNS:
+        if pat.search(key):
+            return field
+    return None
+
+
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def clean(v) -> str:
@@ -191,7 +226,7 @@ def parse_detail(html: str, job_id: str, card: dict) -> dict:
         cnt_el  = soup.find("span", id=f"HRS_SCH_PSTDSC_DESCRLONG${i}")
         content = clean(cnt_el.get_text(separator=" ")) if cnt_el else ""
         if not content or lbl_key in SKIP_SECTIONS: continue
-        col = SECTION_MAP.get(lbl_key)
+        col = resolve_section(lbl_key)
         if col:
             job[col] = content
         else:
@@ -222,7 +257,10 @@ def _wait_for_ajax(page, timeout_ms: int = 30_000):
             timeout=timeout_ms
         )
     except Exception:
-        page.wait_for_timeout(3000)
+        try:
+            page.wait_for_timeout(3000)
+        except Exception:
+            pass
 
 
 def _click_view_all_jobs(page) -> bool:
@@ -293,12 +331,19 @@ def scroll_to_load_all(page, expected_count: int, label: str) -> list[dict]:
                 added += 1
         return added
 
-    harvest(BeautifulSoup(page.content(), "lxml"))
-    print(f"    Initial rows: {len(all_rows)} / {expected_count}", flush=True)
+    try:
+        harvest(BeautifulSoup(page.content(), "lxml"))
+        print(f"    Initial rows: {len(all_rows)} / {expected_count}", flush=True)
+    except Exception as exc:
+        print(f"    ⚠ Initial page.content() failed ({exc}); returning empty.", flush=True)
+        return all_rows
 
     grid_box = None
     for sel in GRID_SEL.split(", "):
-        locs = page.locator(sel.strip()).all()
+        try:
+            locs = page.locator(sel.strip()).all()
+        except Exception:
+            locs = []
         if locs:
             try:
                 grid_box = locs[0].bounding_box()
@@ -313,7 +358,10 @@ def scroll_to_load_all(page, expected_count: int, label: str) -> list[dict]:
 
     cx = grid_box["x"] + grid_box["width"] / 2
     cy = grid_box["y"] + grid_box["height"] / 2
-    page.mouse.move(cx, cy)
+    try:
+        page.mouse.move(cx, cy)
+    except Exception:
+        pass  # mouse positioning is best-effort
 
     stall_count = 0
     for attempt in range(MAX_SCROLL_ATTEMPTS):
@@ -325,10 +373,15 @@ def scroll_to_load_all(page, expected_count: int, label: str) -> list[dict]:
             )
         except Exception:
             pass
-        page.mouse.wheel(0, 600)
-        page.wait_for_timeout(int(SCROLL_PAUSE * 1000))
-
-        added = harvest(BeautifulSoup(page.content(), "lxml"))
+        try:
+            page.mouse.wheel(0, 600)
+            page.wait_for_timeout(int(SCROLL_PAUSE * 1000))
+            added = harvest(BeautifulSoup(page.content(), "lxml"))
+        except Exception as exc:
+            print(f"    ⚠ Scroll interrupted ({exc}); "
+                  f"keeping {len(all_rows)} / {expected_count} rows collected so far.",
+                  flush=True)
+            break
         print(f"    Scroll {attempt+1}: +{added}  →  total {len(all_rows)} / {expected_count}",
               flush=True)
 
@@ -348,7 +401,10 @@ def scroll_to_load_all(page, expected_count: int, label: str) -> list[dict]:
 
 def _read_total_count(page) -> int:
     """Try to read the total job count shown on the listing page."""
-    soup = BeautifulSoup(page.content(), "lxml")
+    try:
+        soup = BeautifulSoup(page.content(), "lxml")
+    except Exception:
+        return 500   # safe upper bound if page is unavailable
     for span in soup.find_all("span"):
         sid = span.get("id", "").upper()
         if "COUNT" in sid or "TOTAL" in sid or "RESULT" in sid:
@@ -372,8 +428,19 @@ def collect_gatech_jobs(page) -> list[dict]:
     """
     print(f"\nStep 1 — Loading GA Tech entry URL (SiteId={SITE_ID}) …", flush=True)
     print(f"  {ENTRY_URL}")
-    page.goto(ENTRY_URL, wait_until="load", timeout=90_000)
-    page.wait_for_timeout(3000)
+    try:
+        page.goto(ENTRY_URL, wait_until="load", timeout=90_000)
+    except Exception as exc:
+        print(f"  ⚠ Failed to load entry URL ({exc}); trying SEARCH_URL …", flush=True)
+        try:
+            page.goto(SEARCH_URL, wait_until="load", timeout=90_000)
+        except Exception:
+            print("  ⚠ Failed to load SEARCH_URL too; returning empty.", flush=True)
+            return []
+    try:
+        page.wait_for_timeout(3000)
+    except Exception:
+        pass
 
     # Try to click "View All Jobs" from the entry/landing page
     print("\nStep 2 — Clicking 'View All Jobs' …", flush=True)
@@ -385,7 +452,10 @@ def collect_gatech_jobs(page) -> list[dict]:
             page.wait_for_selector('span[id^="SCH_JOB_TITLE"]', timeout=30_000)
         except Exception:
             pass
-        page.wait_for_timeout(2000)
+        try:
+            page.wait_for_timeout(2000)
+        except Exception:
+            pass
     else:
         # Maybe we're already on the job listing (SEARCH_URL pattern)
         print("  'View All Jobs' not found — checking if job list is already showing …",
@@ -397,12 +467,18 @@ def collect_gatech_jobs(page) -> list[dict]:
         except Exception:
             # Navigate directly to the search URL with SiteId
             print(f"  Navigating directly to SEARCH_URL …", flush=True)
-            page.goto(SEARCH_URL, wait_until="load", timeout=90_000)
+            try:
+                page.goto(SEARCH_URL, wait_until="load", timeout=90_000)
+            except Exception:
+                pass
             try:
                 page.wait_for_selector('span[id^="SCH_JOB_TITLE"]', timeout=30_000)
             except Exception:
                 pass
-            page.wait_for_timeout(2000)
+            try:
+                page.wait_for_timeout(2000)
+            except Exception:
+                pass
 
     # Read total job count for progress display
     total = _read_total_count(page)
