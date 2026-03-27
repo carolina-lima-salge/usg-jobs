@@ -1,9 +1,9 @@
-name: Daily Job Update
+name: Daily Job Update (UGA + GA Tech + GA State + Merge)
 
 on:
-  # Run every day at 6 AM ET (11 AM UTC)
+  # Run every day at 11 AM ET (4 PM UTC) — 5 hours after OneHCM scraper starts
   schedule:
-    - cron: '0 11 * * *'
+    - cron: '0 16 * * *'
 
   # Allow manual trigger from the GitHub Actions tab
   workflow_dispatch:
@@ -11,7 +11,7 @@ on:
 jobs:
   update-jobs:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # allow up to 6 hours (OneHCM alone takes 3+ hours)
+    timeout-minutes: 60  # fast scrapers + merge should finish well within an hour
     permissions:
       contents: write   # needed to commit and push
 
@@ -31,7 +31,7 @@ jobs:
           pip install --upgrade pip
           pip install requests beautifulsoup4 lxml playwright
 
-      - name: Install Playwright Chromium (for Georgia State scraper)
+      - name: Install Playwright Chromium (for Georgia Tech scraper)
         run: python -m playwright install chromium --with-deps
         continue-on-error: true   # scraper falls back to requests if this fails
 
@@ -48,12 +48,6 @@ jobs:
       - name: Run Georgia State scraper
         working-directory: scrapers
         run: python scraper_gastate.py
-        continue-on-error: true
-
-      - name: Run USG OneHCM scraper (23 institutions)
-        working-directory: scrapers
-        run: python scraper_onehcm.py
-        timeout-minutes: 300  # up to 5 hours for 23 institutions + detail fetching
         continue-on-error: true
 
       - name: Merge all scrapers into usg_all_jobs.csv

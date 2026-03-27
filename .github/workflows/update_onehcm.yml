@@ -1,0 +1,57 @@
+name: Update OneHCM Jobs (23 USG Institutions)
+
+on:
+  # Run every day at 6 AM ET (11 AM UTC)
+  schedule:
+    - cron: '0 11 * * *'
+
+  # Allow manual trigger from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  scrape-onehcm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max — OneHCM alone takes 3+ hours
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests beautifulsoup4 lxml playwright
+
+      - name: Install Playwright Chromium
+        run: python -m playwright install chromium --with-deps
+
+      - name: Run USG OneHCM scraper (23 institutions)
+        working-directory: scrapers
+        run: python scraper_onehcm.py
+        timeout-minutes: 300  # 5 hours for 23 institutions + detail fetching
+
+      - name: Commit onehcm_jobs.csv
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add scrapers/onehcm_jobs.csv
+          if git diff --cached --quiet; then
+            echo "No changes to onehcm_jobs.csv — skipping commit."
+          else
+            COUNT=$(python3 -c "
+import csv
+with open('scrapers/onehcm_jobs.csv', newline='', encoding='utf-8') as f:
+    print(sum(1 for _ in csv.DictReader(f)))
+" 2>/dev/null || echo "?")
+            git commit -m "Update OneHCM jobs data: ${COUNT} listings [skip ci]"
+            git push
+          fi
