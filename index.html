@@ -757,6 +757,13 @@ function parseSalaryNum(job) {
     return -1;
   }
 
+  if (tag === '/sem') {
+    // Semester stipends like "$400 per semester" — annualise × 2 (fall + spring).
+    const semAmounts = allNums.filter(n => n >= 1 && n <= 50000);
+    if (semAmounts.length) return Math.max(...semAmounts) * 2;
+    return -1;
+  }
+
   if (tag === '/mo') {
     // Monthly stipends like "$1,000 per month" — annualise × 12.
     // Filter out noise (e.g. "$25 per semester" in the same string).
@@ -950,8 +957,10 @@ function renderCard(job) {
     const t = salaryTag(j);
     // Already clearly annual — no annotation needed
     if (t === '/yr') return '';
-    // Hourly or no tag but we derived a yearly number — show it
+    // Semester pay — show as annual equivalent with a clarifying label
     const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+    if (t === '/sem') return `<span title="Estimated annual equivalent (2 semesters)" style="margin-left:6px;font-size:0.72rem;color:#6b7280;font-weight:400;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">≈ ${fmt}/yr (2 semesters)</span>`;
+    // Hourly or no tag but we derived a yearly number — show it
     return `<span title="Estimated annual equivalent used for sorting" style="margin-left:6px;font-size:0.72rem;color:#6b7280;font-weight:400;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">≈ ${fmt}/yr</span>`;
   }
 
@@ -1013,6 +1022,8 @@ function salaryTag(job) {
   const s = (job.salary || '').toLowerCase();
   // Explicit hourly — must be unambiguous "per hour" wording
   if (/\bper\s+hour\b|\/hr\b|\/hour\b|\bhourly\b|\ban\s+hour\b/.test(s)) return '/hr';
+  // Semester stipends — e.g. "$400 per semester" (RA housing, student positions)
+  if (/\bper\s+semester\b|\/semester\b/.test(s)) return '/sem';
   // Explicit monthly — e.g. "$1,000 per month", "$1,000/month"
   if (/\bper\s+month\b|\/month\b|\/mo\b/.test(s)) return '/mo';
   if (s.includes('/yr') || s.includes('annual')) return '/yr';
