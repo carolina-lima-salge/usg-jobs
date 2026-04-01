@@ -424,10 +424,15 @@
         <option value="90">Last 90 days</option>
       </select>
 
-      <!-- Sort -->
+      <!-- Date sort -->
       <select id="f-sort" class="filter-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
+      </select>
+
+      <!-- Salary sort -->
+      <select id="f-salary-sort" class="filter-select">
+        <option value="">Any salary order</option>
         <option value="salary-desc">Highest salary</option>
         <option value="salary-asc">Lowest salary</option>
       </select>
@@ -751,9 +756,18 @@ function parseSalaryNum(job) {
     // hourly indicator, that large number IS already the annual — use it directly.
     const annuals = allNums.filter(n => n > 9999);
     if (annuals.length) return Math.max(...annuals);
-    // Pure hourly strings like "$18.27/hr" — annualise the hourly rate
+    // Detect capped hours per week: "19 hours or less per week", "up to 19 hrs/wk"
+    const hrsMatch = salary.match(/\b(\d+)\s*hours?\s*(?:or\s*less|per\s*week|a\s*week)/i);
+    const hoursPerWeek = hrsMatch ? parseInt(hrsMatch[1]) : 40;
     const hourlyRates = allNums.filter(n => n <= 500);
-    if (hourlyRates.length) return Math.max(...hourlyRates) * 2080;
+    if (hourlyRates.length) return Math.max(...hourlyRates) * hoursPerWeek * 52;
+    return -1;
+  }
+
+  if (tag === '/wk') {
+    // Weekly pay — annualise × 52
+    const wkAmounts = allNums.filter(n => n >= 1 && n <= 50000);
+    if (wkAmounts.length) return Math.max(...wkAmounts) * 52;
     return -1;
   }
 
@@ -772,6 +786,14 @@ function parseSalaryNum(job) {
     return -1;
   }
 
+  // Duration-based stipends: "$3,000 for 5 weeks" → annualise × (52/5)
+  const weeksDur = salary.match(/\bfor\s+(?:up\s+to\s+)?(\d+)\s*(?:\(\d+\)\s*)?\s*-?\s*week/i);
+  if (weeksDur && tag !== '/yr') {
+    const weeks = parseInt(weeksDur[1]);
+    const amounts = allNums.filter(n => n >= 1);
+    if (amounts.length && weeks > 0) return Math.max(...amounts) * (52 / weeks);
+  }
+
   return Math.max(...allNums);
 }
 
@@ -786,14 +808,15 @@ function onSearchInput() {
 function applyFilters() {
   const q          = document.getElementById('search').value.trim().toLowerCase();
   const type       = document.getElementById('f-type').value.toLowerCase();
-  const posted     = parseInt(document.getElementById('f-posted').value) || 0;
-  const sort       = document.getElementById('f-sort').value;
-  const salOnly    = document.getElementById('f-salary').checked;
+  const posted      = parseInt(document.getElementById('f-posted').value) || 0;
+  const sort        = document.getElementById('f-sort').value;
+  const salarySort  = document.getElementById('f-salary-sort').value;
+  const salOnly     = document.getElementById('f-salary').checked;
   const remoteOnly = document.getElementById('f-remote').checked;
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || selectedInsts.size > 0 || type || selectedLocs.size > 0 || posted || salOnly || remoteOnly || sort !== 'newest';
+  const hasFilters = q || selectedInsts.size > 0 || type || selectedLocs.size > 0 || posted || salOnly || remoteOnly || sort !== 'newest' || salarySort !== '';
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
@@ -826,29 +849,31 @@ function applyFilters() {
   // Sort — CV match overrides all other sorts when active
   if (matchMode) {
     filtered.sort((a, b) => (cvScores[b.id] || 0) - (cvScores[a.id] || 0));
-  } else if (sort === 'salary-desc') {
-    filtered.sort((a, b) => {
-      const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-      if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);  // both unknown → newest first
-      if (na === -1) return 1;   // no salary → bottom
-      if (nb === -1) return -1;
-      if (nb !== na) return nb - na;
-      return dateOf(b) - dateOf(a);  // tie → newest first
-    });
-  } else if (sort === 'salary-asc') {
-    filtered.sort((a, b) => {
-      const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-      if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);  // both unknown → newest first
-      if (na === -1) return 1;   // no salary → bottom
-      if (nb === -1) return -1;
-      if (na !== nb) return na - nb;
-      return dateOf(b) - dateOf(a);  // tie → newest first
-    });
-  }
-  // 'newest' is the default order from jobs.json (already sorted by date desc)
-  // For 'oldest', reverse the newest order
-  if (sort === 'oldest') {
-    filtered.sort((a, b) => dateOf(a) - dateOf(b));
+  } else {
+    // Apply date sort first as base order
+    if (sort === 'oldest') {
+      filtered.sort((a, b) => dateOf(a) - dateOf(b));
+    }
+    // Salary sort overrides date sort when selected
+    if (salarySort === 'salary-desc') {
+      filtered.sort((a, b) => {
+        const na = parseSalaryNum(a), nb = parseSalaryNum(b);
+        if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);
+        if (na === -1) return 1;
+        if (nb === -1) return -1;
+        if (nb !== na) return nb - na;
+        return dateOf(b) - dateOf(a);
+      });
+    } else if (salarySort === 'salary-asc') {
+      filtered.sort((a, b) => {
+        const na = parseSalaryNum(a), nb = parseSalaryNum(b);
+        if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);
+        if (na === -1) return 1;
+        if (nb === -1) return -1;
+        if (na !== nb) return na - nb;
+        return dateOf(b) - dateOf(a);
+      });
+    }
   }
 
   // Update the Posted column header arrow + active state
@@ -960,6 +985,15 @@ function renderCard(job) {
     // Semester pay — show as annual equivalent with a clarifying label
     const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
     if (t === '/sem') return `<span title="Estimated annual equivalent (2 semesters)" style="margin-left:6px;font-size:0.72rem;color:#6b7280;font-weight:400;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">≈ ${fmt}/yr (2 semesters)</span>`;
+    if (t === '/wk') return `<span title="Estimated annual equivalent (weekly × 52)" style="margin-left:6px;font-size:0.72rem;color:#6b7280;font-weight:400;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">≈ ${fmt}/yr</span>`;
+    // Hourly with partial hours per week
+    if (t === '/hr') {
+      const hrsMatch = (j.salary || '').match(/\b(\d+)\s*hours?\s*(?:or\s*less|per\s*week|a\s*week)/i);
+      if (hrsMatch) {
+        const hrs = parseInt(hrsMatch[1]);
+        return `<span title="Estimated annual equivalent at ${hrs} hrs/wk" style="margin-left:6px;font-size:0.72rem;color:#6b7280;font-weight:400;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">≈ ${fmt}/yr (${hrs} hrs/wk)</span>`;
+      }
+    }
     // Hourly or no tag but we derived a yearly number — show it
     return `<span title="Estimated annual equivalent used for sorting" style="margin-left:6px;font-size:0.72rem;color:#6b7280;font-weight:400;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;">≈ ${fmt}/yr</span>`;
   }
@@ -1024,9 +1058,11 @@ function salaryTag(job) {
   if (/\bper\s+hour\b|\/hr\b|\/hour\b|\bhourly\b|\ban\s+hour\b/.test(s)) return '/hr';
   // Semester stipends — e.g. "$400 per semester" (RA housing, student positions)
   if (/\bper\s+semester\b|\/semester\b/.test(s)) return '/sem';
+  // Weekly pay — e.g. "$500 per week", "$500/week"
+  if (/\bper\s+week\b|\/week\b|\/wk\b|\bweekly\b/.test(s)) return '/wk';
   // Explicit monthly — e.g. "$1,000 per month", "$1,000/month"
   if (/\bper\s+month\b|\/month\b|\/mo\b/.test(s)) return '/mo';
-  if (s.includes('/yr') || s.includes('annual')) return '/yr';
+  if (s.includes('/yr') || s.includes('annual') || /academic\s+year/.test(s)) return '/yr';
   // Magnitude check on the largest dollar amount found
   const nums = [...s.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
     .map(m => parseFloat(m[1].replace(/,/g, '')))
@@ -1124,7 +1160,7 @@ function goPage(p) {
 
 // ── Event listeners ────────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', onSearchInput);
-['f-type','f-posted','f-sort'].forEach(id => {
+['f-type','f-posted','f-sort','f-salary-sort'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); });
 });
 document.getElementById('f-salary').addEventListener('change',  () => { currentPage = 1; applyFilters(); });
@@ -1132,7 +1168,7 @@ document.getElementById('f-remote').addEventListener('change',  () => { currentP
 
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
-  ['f-type','f-posted','f-sort'].forEach(id => {
+  ['f-type','f-posted','f-sort','f-salary-sort'].forEach(id => {
     document.getElementById(id).value = id === 'f-sort' ? 'newest' : '';
   });
   document.getElementById('f-salary').checked = false;

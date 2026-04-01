@@ -47,15 +47,10 @@ TALEO_TEMPS_URL  = (
 )
 
 FACULTY_BASE     = "https://facultycareers.gsu.edu"
-FACULTY_TYPE3_URL = (
+# No position_type_id filter — catches all types (tenure-track, NTT, visiting, etc.)
+FACULTY_ALL_URL  = (
     f"{FACULTY_BASE}/postings/search"
-    "?utf8=%E2%9C%93&query=&query_v0_posted_at_date="
-    "&query_position_type_id%5B%5D=3&435=&commit=Search"
-)
-FACULTY_TYPE4_URL = (
-    f"{FACULTY_BASE}/postings/search"
-    "?utf8=%E2%9C%93&query=&query_v0_posted_at_date="
-    "&query_position_type_id%5B%5D=4&435=&commit=Search"
+    "?utf8=%E2%9C%93&query=&query_v0_posted_at_date=&commit=Search"
 )
 
 HEADERS = {
@@ -1441,8 +1436,7 @@ def main():
         (TALEO_TEMPS_URL,  "Taleo PanthTemps"),
     ]
     faculty_portals = [
-        (FACULTY_TYPE3_URL, "Faculty position_type=3"),
-        (FACULTY_TYPE4_URL, "Faculty position_type=4"),
+        (FACULTY_ALL_URL, "Faculty (all position types)"),
     ]
 
     # ── Try to start Playwright (used as fallback for detail pages) ────────────

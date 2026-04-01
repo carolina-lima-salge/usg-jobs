@@ -84,6 +84,32 @@ def is_garbled(s: str) -> bool:
         return True
     return False
 
+def _trim_salary(s: str) -> str:
+    """
+    Extract just the dollar amount/range from a verbose salary paragraph.
+    E.g. "The salary range for this position is $47,040 to $57,300. Offers are
+    based on relevant experience. Comprehensive benefits..." → "$47,040 to $57,300."
+    Short strings (<= 120 chars) are returned unchanged.
+    """
+    if not s or len(s) <= 120:
+        return s
+    m = re.search(r'\$\s*[\d,]', s)
+    if not m:
+        # No dollar amount — return first 120 chars
+        return s[:120].rsplit(' ', 1)[0] + '…'
+    dollar_pos = m.start()
+    # Find end of the sentence containing the dollar sign
+    seg_end = len(s)
+    for i in range(dollar_pos + 1, min(dollar_pos + 200, len(s))):
+        if s[i] == '.' and (i + 1 >= len(s) or s[i + 1] in ' \t\n\r'):
+            seg_end = i + 1
+            break
+    result = s[dollar_pos:seg_end].strip()
+    if len(result) > 150:
+        result = result[:120].rsplit(' ', 1)[0] + '…'
+    return result
+
+
 def extract_salary_from_extra(extra_sections: str, existing_salary: str) -> str:
     """
     Pull salary out of extra_sections when the main salary field is blank.
@@ -261,6 +287,7 @@ def convert(csv_path: Path) -> dict:
                     clean(row.get("responsibilities", "")),
                 )
             )
+            salary_raw  = _trim_salary(salary_raw)
             salary_type = detect_salary_type(salary_raw)
 
             # Full/Part-Time — dedicated column, or GA State dept blob fallback
