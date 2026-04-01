@@ -49,5 +49,6 @@ jobs:
           else
             COUNT=$(python3 -c "import csv; print(sum(1 for _ in csv.DictReader(open('scrapers/onehcm_jobs.csv'))))" 2>/dev/null || echo "?")
             git commit -m "Update OneHCM jobs data: ${COUNT} listings [skip ci]"
+            git pull --rebase
             git push
           fi

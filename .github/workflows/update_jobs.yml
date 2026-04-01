@@ -95,5 +95,6 @@ jobs:
           else
             TOTAL=$(python3 -c "import json; d=json.load(open('jobs.json')); print(d['meta']['total'])")
             git commit -m "Auto-update jobs data: ${TOTAL} listings [skip ci]"
+            git pull --rebase
             git push
           fi
