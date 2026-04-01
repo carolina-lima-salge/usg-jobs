@@ -794,7 +794,11 @@ function parseSalaryNum(job) {
     if (amounts.length && weeks > 0) return Math.max(...amounts) * (52 / weeks);
   }
 
-  return Math.max(...allNums);
+  // No rate indicator — for small ambiguous amounts (stipends, one-time payments)
+  // don't try to annualise; just return as-is only if clearly annual-scale
+  const maxVal = Math.max(...allNums);
+  if (!tag && maxVal < 5000) return maxVal;  // show value but skip /yr annotation
+  return maxVal;
 }
 
 // ── Filtering ──────────────────────────────────────────────────────────────────
@@ -1054,14 +1058,14 @@ function renderCard(job) {
 function salaryTag(job) {
   const t = (job.salary_type || '').toLowerCase();
   const s = (job.salary || '').toLowerCase();
-  // Explicit hourly — must be unambiguous "per hour" wording
-  if (/\bper\s+hour\b|\/hr\b|\/hour\b|\bhourly\b|\ban\s+hour\b/.test(s)) return '/hr';
+  // Explicit hourly — "per hour" OR "per hours" (plural)
+  if (/\bper\s+hours?\b|\/hr\b|\/hour\b|\bhourly\b|\ban\s+hour\b/.test(s)) return '/hr';
+  // Explicit monthly — checked before semester so "$500/mo ... $25/semester" → /mo
+  if (/\bper\s+month\b|\/month\b|\/mo\b/.test(s)) return '/mo';
   // Semester stipends — e.g. "$400 per semester" (RA housing, student positions)
   if (/\bper\s+semester\b|\/semester\b/.test(s)) return '/sem';
   // Weekly pay — e.g. "$500 per week", "$500/week"
   if (/\bper\s+week\b|\/week\b|\/wk\b|\bweekly\b/.test(s)) return '/wk';
-  // Explicit monthly — e.g. "$1,000 per month", "$1,000/month"
-  if (/\bper\s+month\b|\/month\b|\/mo\b/.test(s)) return '/mo';
   if (s.includes('/yr') || s.includes('annual') || /academic\s+year/.test(s)) return '/yr';
   // Magnitude check on the largest dollar amount found
   const nums = [...s.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
@@ -1074,7 +1078,9 @@ function salaryTag(job) {
   }
   // Fall back to explicit field for ambiguous mid-range
   if (t === 'hourly') return '/hr';
-  if (t === 'annual') return '/yr';
+  // Only apply annual tag from salary_type if the amount is clearly annual-scale.
+  // Small amounts like "$1,000 stipend" have no explicit rate keyword — show as-is.
+  if (t === 'annual' && nums.length && Math.max(...nums) >= 5000) return '/yr';
   return '';
 }
 
