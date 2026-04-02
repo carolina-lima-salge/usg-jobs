@@ -436,17 +436,16 @@
         <option value="90">Last 90 days</option>
       </select>
 
-      <!-- Date sort -->
+      <!-- Sort -->
       <select id="f-sort" class="filter-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
-      </select>
-
-      <!-- Salary sort -->
-      <select id="f-salary-sort" class="filter-select">
-        <option value="">Any salary order</option>
         <option value="salary-desc">Highest salary</option>
         <option value="salary-asc">Lowest salary</option>
+        <option value="blend-desc">Recent &amp; high pay</option>
+        <option value="blend-asc">Recent &amp; low pay</option>
+        <option value="blend-old-desc">Older &amp; high pay</option>
+        <option value="blend-old-asc">Older &amp; low pay</option>
       </select>
 
       <!-- Min salary filter -->
@@ -875,14 +874,13 @@ function applyFilters() {
   const employment  = document.getElementById('f-employment').value.toLowerCase();
   const posted      = parseInt(document.getElementById('f-posted').value) || 0;
   const sort        = document.getElementById('f-sort').value;
-  const salarySort  = document.getElementById('f-salary-sort').value;
   const minSalary   = parseInt(document.getElementById('f-min-salary').value) || 0;
   const salOnly     = document.getElementById('f-salary').checked;
   const remoteOnly = document.getElementById('f-remote').checked;
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || salOnly || remoteOnly || sort !== 'newest' || salarySort !== '';
+  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || salOnly || remoteOnly || sort !== 'newest';
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
@@ -925,36 +923,50 @@ function applyFilters() {
   // Sort — CV match overrides all other sorts when active
   if (matchMode) {
     filtered.sort((a, b) => (cvScores[b.id] || 0) - (cvScores[a.id] || 0));
-  } else {
-    // Date comparator respects f-sort direction (newest ↓ default, oldest ↑)
-    const dateCmp = sort === 'oldest'
-      ? (a, b) => dateOf(a) - dateOf(b)
-      : (a, b) => dateOf(b) - dateOf(a);
+  } else if (sort === 'blend-desc' || sort === 'blend-asc' || sort === 'blend-old-desc' || sort === 'blend-old-asc') {
+    // Blended sort: salary rank + recency rank combined (60/40 weight)
+    // Each job gets a 0-1 score on both dimensions; they're averaged together.
+    const salNums = filtered.map(j => parseSalaryNum(j));
+    const dates   = filtered.map(j => dateOf(j));
 
-    if (salarySort === 'salary-desc') {
-      // Primary: highest salary  |  Secondary: date per f-sort
-      filtered.sort((a, b) => {
-        const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-        if (na === -1 && nb === -1) return dateCmp(a, b);
-        if (na === -1) return 1;
-        if (nb === -1) return -1;
-        if (nb !== na) return nb - na;
-        return dateCmp(a, b);
-      });
-    } else if (salarySort === 'salary-asc') {
-      // Primary: lowest salary  |  Secondary: date per f-sort
-      filtered.sort((a, b) => {
-        const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-        if (na === -1 && nb === -1) return dateCmp(a, b);
-        if (na === -1) return 1;
-        if (nb === -1) return -1;
-        if (na !== nb) return na - nb;
-        return dateCmp(a, b);
-      });
-    } else {
-      // No salary sort — sort purely by date
-      filtered.sort(dateCmp);
-    }
+    const salMax = Math.max(...salNums.filter(n => n > 0), 1);
+    const salMin = Math.min(...salNums.filter(n => n > 0), 0);
+    const dateMax = Math.max(...dates, 1);
+    const dateMin = Math.min(...dates.filter(d => d > 0), 0);
+    const dateRange = dateMax - dateMin || 1;
+    const salRange  = salMax  - salMin  || 1;
+
+    const scoreMap = new Map();
+    filtered.forEach((job, i) => {
+      const sal  = salNums[i];
+      const dt   = dates[i];
+      const salScore  = sal  > 0 ? (sal  - salMin) / salRange  : 0;
+      const dateScore = dt   > 0 ? (dt   - dateMin) / dateRange : 0;
+      const directedSal  = (sort === 'blend-desc' || sort === 'blend-old-desc') ? salScore : (1 - salScore);
+      const directedDate = (sort === 'blend-desc' || sort === 'blend-asc')      ? dateScore : (1 - dateScore);
+      scoreMap.set(job.id, directedSal * 0.6 + directedDate * 0.4);
+    });
+
+    filtered.sort((a, b) => (scoreMap.get(b.id) || 0) - (scoreMap.get(a.id) || 0));
+  } else if (sort === 'salary-desc') {
+    filtered.sort((a, b) => {
+      const na = parseSalaryNum(a), nb = parseSalaryNum(b);
+      if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);
+      if (na === -1) return 1; if (nb === -1) return -1;
+      return nb !== na ? nb - na : dateOf(b) - dateOf(a);
+    });
+  } else if (sort === 'salary-asc') {
+    filtered.sort((a, b) => {
+      const na = parseSalaryNum(a), nb = parseSalaryNum(b);
+      if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);
+      if (na === -1) return 1; if (nb === -1) return -1;
+      return na !== nb ? na - nb : dateOf(b) - dateOf(a);
+    });
+  } else if (sort === 'oldest') {
+    filtered.sort((a, b) => dateOf(a) - dateOf(b));
+  } else {
+    // Default: newest first
+    filtered.sort((a, b) => dateOf(b) - dateOf(a));
   }
 
   // Update the Posted column header arrow + active state
@@ -1248,7 +1260,7 @@ function saveStateToHash() {
   const params = new URLSearchParams();
   const q = document.getElementById('search').value.trim();
   if (q) params.set('q', q);
-  ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
+  ['f-type','f-employment','f-posted','f-sort','f-min-salary'].forEach(id => {
     const v = document.getElementById(id).value;
     const def = id === 'f-sort' ? 'newest' : '';
     if (v && v !== def) params.set(id.replace('f-',''), v);
@@ -1266,7 +1278,7 @@ function loadStateFromHash() {
   if (!hash) return;
   const params = new URLSearchParams(hash);
   if (params.has('q'))          document.getElementById('search').value = params.get('q');
-  ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
+  ['f-type','f-employment','f-posted','f-sort','f-min-salary'].forEach(id => {
     const key = id.replace('f-','');
     if (params.has(key)) document.getElementById(id).value = params.get(key);
   });
@@ -1279,7 +1291,7 @@ function loadStateFromHash() {
 
 // ── Event listeners ────────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', onSearchInput);
-['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
+['f-type','f-employment','f-posted','f-sort','f-min-salary'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); saveStateToHash(); });
 });
 document.getElementById('f-salary').addEventListener('change',  () => { currentPage = 1; applyFilters(); saveStateToHash(); });
@@ -1287,7 +1299,7 @@ document.getElementById('f-remote').addEventListener('change',  () => { currentP
 
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
-  ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
+  ['f-type','f-employment','f-posted','f-sort','f-min-salary'].forEach(id => {
     document.getElementById(id).value = id === 'f-sort' ? 'newest' : '';
   });
   document.getElementById('f-salary').checked = false;
