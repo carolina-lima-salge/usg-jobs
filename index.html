@@ -926,29 +926,34 @@ function applyFilters() {
   if (matchMode) {
     filtered.sort((a, b) => (cvScores[b.id] || 0) - (cvScores[a.id] || 0));
   } else {
-    // Apply date sort first as base order
-    if (sort === 'oldest') {
-      filtered.sort((a, b) => dateOf(a) - dateOf(b));
-    }
-    // Salary sort overrides date sort when selected
+    // Date comparator respects f-sort direction (newest ↓ default, oldest ↑)
+    const dateCmp = sort === 'oldest'
+      ? (a, b) => dateOf(a) - dateOf(b)
+      : (a, b) => dateOf(b) - dateOf(a);
+
     if (salarySort === 'salary-desc') {
+      // Primary: highest salary  |  Secondary: date per f-sort
       filtered.sort((a, b) => {
         const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-        if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);
+        if (na === -1 && nb === -1) return dateCmp(a, b);
         if (na === -1) return 1;
         if (nb === -1) return -1;
         if (nb !== na) return nb - na;
-        return dateOf(b) - dateOf(a);
+        return dateCmp(a, b);
       });
     } else if (salarySort === 'salary-asc') {
+      // Primary: lowest salary  |  Secondary: date per f-sort
       filtered.sort((a, b) => {
         const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-        if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);
+        if (na === -1 && nb === -1) return dateCmp(a, b);
         if (na === -1) return 1;
         if (nb === -1) return -1;
         if (na !== nb) return na - nb;
-        return dateOf(b) - dateOf(a);
+        return dateCmp(a, b);
       });
+    } else {
+      // No salary sort — sort purely by date
+      filtered.sort(dateCmp);
     }
   }
 
