@@ -38,8 +38,8 @@
     ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
 
     /* ── Row layout ── */
-    .card-expand { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
-    .card-expand.open { max-height: 1200px; }
+    .card-expand { max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0,1,0,1); }
+    .card-expand.open { max-height: 3000px; transition: max-height 0.6s cubic-bezier(1,0,1,0); }
     .chevron { transition: transform 0.2s ease; color: var(--text-3); flex-shrink: 0; }
     .chevron.open { transform: rotate(180deg); }
 
@@ -122,6 +122,11 @@
     .badge-temp     { background: #fefce8; color: #854d0e; }
     .badge-hourly   { background: #f0fdf4; color: #166534; }
     .badge-annual   { background: #eff6ff; color: #1e40af; }
+
+    /* ── New / Closes-soon indicators ── */
+    .badge-new { background: #dcfce7; color: #15803d; font-weight:700; animation: pulse-new 2s infinite; }
+    @keyframes pulse-new { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+    .badge-closing { background: #fff7ed; color: #c2410c; }
 
     /* ── Match badges ── */
     .match-high { background: #f0fdf4; color: #166534; }
@@ -402,6 +407,13 @@
         <option value="Part-Time">Part-Time</option>
       </select>
 
+      <!-- Regular / Temporary -->
+      <select id="f-employment" class="filter-select">
+        <option value="">Regular &amp; Temp</option>
+        <option value="Regular">Regular</option>
+        <option value="Temporary">Temporary</option>
+      </select>
+
       <!-- Location multi-select -->
       <div class="multiselect">
         <button class="multiselect-btn" id="ms-loc-btn" type="button">
@@ -435,6 +447,15 @@
         <option value="">Any salary order</option>
         <option value="salary-desc">Highest salary</option>
         <option value="salary-asc">Lowest salary</option>
+      </select>
+
+      <!-- Min salary filter -->
+      <select id="f-min-salary" class="filter-select">
+        <option value="">Any salary</option>
+        <option value="30000">$30K+</option>
+        <option value="50000">$50K+</option>
+        <option value="75000">$75K+</option>
+        <option value="100000">$100K+</option>
       </select>
 
       <!-- Has salary checkbox -->
@@ -572,7 +593,7 @@ function buildMultiselect(optContainerId, searchInputId, clearBtnId, btnId, coun
     cb.addEventListener('change', () => {
       if (cb.checked) selectedSet.add(item); else selectedSet.delete(item);
       updateMultiselectBtn(btnId, countId, selectedSet);
-      currentPage = 1; applyFilters();
+      currentPage = 1; applyFilters(); saveStateToHash();
     });
     lbl.appendChild(cb);
     lbl.appendChild(document.createTextNode(' ' + item));
@@ -655,6 +676,25 @@ function sourceBadgeClass(source) {
   return 'badge-onehcm';
 }
 
+function newBadge(job) {
+  if (!job.posted) return '';
+  const d = parseDate(job.posted);
+  if (!d) return '';
+  const age = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (age <= 1) return `<span class="badge badge-new">New</span>`;
+  return '';
+}
+
+function closingBadge(job) {
+  if (!job.closes) return '';
+  const d = parseDate(job.closes);
+  if (!d) return '';
+  const daysLeft = Math.floor((d.getTime() - Date.now()) / 86400000);
+  if (daysLeft < 0) return '';  // already filtered out, but just in case
+  if (daysLeft <= 7) return `<span class="badge badge-closing" title="Closes ${fmtDate(job.closes)}">Closes in ${daysLeft === 0 ? 'today' : daysLeft + 'd'}</span>`;
+  return '';
+}
+
 function typeBadge(type) {
   if (!type) return '';
   const cls = type.toLowerCase().includes('full') ? 'badge-fulltime' : 'badge-parttime';
@@ -713,6 +753,26 @@ async function loadData() {
       'ms-loc-btn', 'ms-loc-count', 'ms-loc-panel',
       data.meta.locations || [], selectedLocs
     );
+
+    // Restore multi-select values from URL hash (populated after options are built)
+    if (window._pendingInsts) {
+      window._pendingInsts.forEach(v => {
+        selectedInsts.add(v);
+        const cb = document.querySelector(`#ms-inst-options input[value="${CSS.escape(v)}"]`);
+        if (cb) cb.checked = true;
+      });
+      updateMultiselectBtn('ms-inst-btn', 'ms-inst-count', selectedInsts);
+      delete window._pendingInsts;
+    }
+    if (window._pendingLocs) {
+      window._pendingLocs.forEach(v => {
+        selectedLocs.add(v);
+        const cb = document.querySelector(`#ms-loc-options input[value="${CSS.escape(v)}"]`);
+        if (cb) cb.checked = true;
+      });
+      updateMultiselectBtn('ms-loc-btn', 'ms-loc-count', selectedLocs);
+      delete window._pendingLocs;
+    }
 
     // Meta bar
     document.getElementById('meta-bar').innerHTML =
@@ -806,21 +866,23 @@ let searchTimer = null;
 
 function onSearchInput() {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => { currentPage = 1; applyFilters(); }, 220);
+  searchTimer = setTimeout(() => { currentPage = 1; applyFilters(); saveStateToHash(); }, 220);
 }
 
 function applyFilters() {
   const q          = document.getElementById('search').value.trim().toLowerCase();
   const type       = document.getElementById('f-type').value.toLowerCase();
+  const employment  = document.getElementById('f-employment').value.toLowerCase();
   const posted      = parseInt(document.getElementById('f-posted').value) || 0;
   const sort        = document.getElementById('f-sort').value;
   const salarySort  = document.getElementById('f-salary-sort').value;
+  const minSalary   = parseInt(document.getElementById('f-min-salary').value) || 0;
   const salOnly     = document.getElementById('f-salary').checked;
   const remoteOnly = document.getElementById('f-remote').checked;
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || selectedInsts.size > 0 || type || selectedLocs.size > 0 || posted || salOnly || remoteOnly || sort !== 'newest' || salarySort !== '';
+  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || salOnly || remoteOnly || sort !== 'newest' || salarySort !== '';
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
@@ -829,6 +891,11 @@ function applyFilters() {
     if (type) {
       const ft = (job.type || '').toLowerCase();
       if (!ft.includes(type)) return false;
+    }
+
+    if (employment) {
+      const em = (job.employment || '').toLowerCase();
+      if (!em.includes(employment)) return false;
     }
 
     if (selectedLocs.size > 0 && !selectedLocs.has(job.location)) return false;
@@ -840,10 +907,15 @@ function applyFilters() {
 
     if (salOnly && !job.salary) return false;
 
+    if (minSalary > 0) {
+      const n = parseSalaryNum(job);
+      if (n < minSalary) return false;
+    }
+
     if (remoteOnly && !job.remote) return false;
 
     if (q) {
-      const haystack = `${job.title} ${job.institution} ${job.department} ${job.location}`.toLowerCase();
+      const haystack = `${job.title} ${job.institution} ${job.department} ${job.location} ${job.summary}`.toLowerCase();
       if (!q.split(/\s+/).every(w => haystack.includes(w))) return false;
     }
 
@@ -952,11 +1024,13 @@ function renderCard(job) {
   const closes    = job.closes ? ` · Closes ${fmtDate(job.closes)}` : '';
   const postedShort = job.posted ? fmtDateShort(job.posted) : '—';
 
-  const cvMatchHtml = matchMode && cvScores[job.id] != null
+  const cvMatchHtml   = matchMode && cvScores[job.id] != null
     ? matchBadge(cvScores[job.id], cvReasons[job.id]) : '';
-  const remoteTag = job.remote
+  const remoteTag     = job.remote
     ? `<span class="badge" style="background:#f0fdf4;color:#166534;">Remote</span>` : '';
   const typeBadgeHtml = typeBadge(job.type);
+  const newBadgeHtml  = newBadge(job);
+  const closingHtml   = closingBadge(job);
 
   const summary = job.summary
     ? `<p style="color:var(--text-2);font-size:0.82rem;line-height:1.65;margin:0 0 14px;">${esc(job.summary)}</p>`
@@ -1030,7 +1104,7 @@ function renderCard(job) {
     <div class="row-col">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
         <span class="row-title-text">${esc(job.title || 'Untitled Position')}</span>
-        ${cvMatchHtml}
+        ${newBadgeHtml}${closingHtml}${cvMatchHtml}
       </div>
       ${salaryLine}
       <div class="mob-meta">${mobMetaParts}</div>
@@ -1066,7 +1140,7 @@ function salaryTag(job) {
   if (/\bper\s+semester\b|\/semester\b/.test(s)) return '/sem';
   // Weekly pay — e.g. "$500 per week", "$500/week"
   if (/\bper\s+week\b|\/week\b|\/wk\b|\bweekly\b/.test(s)) return '/wk';
-  if (s.includes('/yr') || s.includes('annual') || /academic\s+year/.test(s)) return '/yr';
+  if (s.includes('/yr') || s.includes('annual') || /academic\s+year/.test(s) || /\bper\s+year\b/.test(s)) return '/yr';
   // Magnitude check on the largest dollar amount found
   const nums = [...s.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
     .map(m => parseFloat(m[1].replace(/,/g, '')))
@@ -1086,8 +1160,8 @@ function salaryTag(job) {
 
 function fmtDateShort(str) {
   if (!str) return '—';
-  const d = new Date(str);
-  if (isNaN(d)) return str;
+  const d = parseDate(str);   // parseDate appends T00:00:00 so timezone matches Date.now()
+  if (!d) return str;
   const diff = Math.floor((Date.now() - d) / 86400000);
   if (diff === 0) return 'Today';
   if (diff === 1) return '1d ago';
@@ -1164,17 +1238,51 @@ function goPage(p) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// ── URL hash state (shareable links) ──────────────────────────────────────────
+function saveStateToHash() {
+  const params = new URLSearchParams();
+  const q = document.getElementById('search').value.trim();
+  if (q) params.set('q', q);
+  ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
+    const v = document.getElementById(id).value;
+    const def = id === 'f-sort' ? 'newest' : '';
+    if (v && v !== def) params.set(id.replace('f-',''), v);
+  });
+  if (document.getElementById('f-salary').checked)  params.set('hasSalary', '1');
+  if (document.getElementById('f-remote').checked)  params.set('remote', '1');
+  if (selectedInsts.size) params.set('inst', [...selectedInsts].join('|'));
+  if (selectedLocs.size)  params.set('loc',  [...selectedLocs].join('|'));
+  const str = params.toString();
+  history.replaceState(null, '', str ? `#${str}` : window.location.pathname);
+}
+
+function loadStateFromHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return;
+  const params = new URLSearchParams(hash);
+  if (params.has('q'))          document.getElementById('search').value = params.get('q');
+  ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
+    const key = id.replace('f-','');
+    if (params.has(key)) document.getElementById(id).value = params.get(key);
+  });
+  if (params.get('hasSalary') === '1') document.getElementById('f-salary').checked = true;
+  if (params.get('remote')    === '1') document.getElementById('f-remote').checked = true;
+  // Multi-selects are populated after data loads — store pending values for later
+  if (params.has('inst')) window._pendingInsts = params.get('inst').split('|');
+  if (params.has('loc'))  window._pendingLocs  = params.get('loc').split('|');
+}
+
 // ── Event listeners ────────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', onSearchInput);
-['f-type','f-posted','f-sort','f-salary-sort'].forEach(id => {
-  document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); });
+['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); saveStateToHash(); });
 });
-document.getElementById('f-salary').addEventListener('change',  () => { currentPage = 1; applyFilters(); });
-document.getElementById('f-remote').addEventListener('change',  () => { currentPage = 1; applyFilters(); });
+document.getElementById('f-salary').addEventListener('change',  () => { currentPage = 1; applyFilters(); saveStateToHash(); });
+document.getElementById('f-remote').addEventListener('change',  () => { currentPage = 1; applyFilters(); saveStateToHash(); });
 
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
-  ['f-type','f-posted','f-sort','f-salary-sort'].forEach(id => {
+  ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
     document.getElementById(id).value = id === 'f-sort' ? 'newest' : '';
   });
   document.getElementById('f-salary').checked = false;
@@ -1197,6 +1305,7 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 
   currentPage = 1;
   applyFilters();
+  history.replaceState(null, '', window.location.pathname);  // clear URL hash
 });
 
 // ── CV Matching ─────────────────────────────────────────────────────────────────
@@ -1647,6 +1756,7 @@ dz.addEventListener('click', e => {
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────────
+loadStateFromHash();   // restore URL-encoded filter state before data loads
 loadData();
 </script>
 

@@ -202,7 +202,7 @@ def detect_salary_type(salary: str) -> str:
     if not s:
         return ""
     # Must be explicit per-hour pay indicator — NOT just "business hours"
-    if re.search(r'\bper\s+hour\b|/hr\b|/hour\b|\bhourly\b|\ban\s+hour\b', s):
+    if re.search(r'\bper\s+hours?\b|/hr\b|/hour\b|\bhourly\b|\ban\s+hour\b', s):
         return "Hourly"
     # Has dollar amounts → likely annual
     if re.search(r'\$\s*[\d,]+', s):
