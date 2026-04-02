@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ── Design tokens (Dashboard / Data-forward) ── */
     :root {
@@ -54,7 +55,7 @@
 
     .row-header {
       display: grid;
-      grid-template-columns: 1fr 168px 148px 96px 72px 36px;
+      grid-template-columns: 1fr 168px 148px 96px 72px 24px 36px;
       align-items: center;
       padding: 11px 16px;
       cursor: pointer;
@@ -73,7 +74,7 @@
     /* Table column header */
     #tbl-header {
       display: grid;
-      grid-template-columns: 1fr 168px 148px 96px 72px 36px;
+      grid-template-columns: 1fr 168px 148px 96px 72px 24px 36px;
       padding: 7px 16px;
       background: #f8fafc;
       border-bottom: 1px solid var(--border-strong);
@@ -287,13 +288,77 @@
     .cv-browse-label { color: var(--accent); font-weight: 500; cursor: pointer; }
     .cv-browse-label:hover { text-decoration: underline; }
 
+    /* ── Auth modal ── */
+    #auth-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500;
+      display: flex; align-items: center; justify-content: center; padding: 16px;
+    }
+    #auth-overlay.hidden { display: none; }
+    #auth-card {
+      background: var(--surface); border-radius: 8px; box-shadow: var(--shadow-md);
+      width: 100%; max-width: 400px; padding: 28px 28px 24px;
+    }
+    .auth-tab-btn {
+      flex: 1; padding: 8px; font-size: 0.82rem; font-weight: 600; border: none;
+      background: none; cursor: pointer; border-bottom: 2px solid transparent;
+      color: var(--text-2); font-family: inherit; transition: color 0.12s;
+    }
+    .auth-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .auth-input {
+      width: 100%; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 8px 11px; font-size: 0.84rem; font-family: inherit; outline: none;
+      color: var(--text-1); background: var(--surface); margin-bottom: 10px;
+    }
+    .auth-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+    .auth-btn-primary {
+      width: 100%; background: var(--accent); color: white; border: none;
+      border-radius: var(--radius); padding: 9px; font-size: 0.84rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background 0.12s; margin-top: 4px;
+    }
+    .auth-btn-primary:hover  { background: var(--accent-dark); }
+    .auth-btn-primary:disabled { background: var(--text-3); cursor: default; }
+    .auth-msg { font-size: 0.78rem; margin-top: 8px; text-align: center; min-height: 18px; }
+    .auth-msg.err  { color: #b91c1c; }
+    .auth-msg.ok   { color: #166534; }
+
+    /* ── User menu in header ── */
+    #user-menu-wrap { position: relative; }
+    #user-menu-panel {
+      position: absolute; top: calc(100% + 8px); right: 0; background: var(--surface);
+      border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: var(--shadow-md);
+      min-width: 190px; z-index: 300; padding: 6px;
+    }
+    #user-menu-panel.hidden { display: none; }
+    .umenu-item {
+      display: block; width: 100%; text-align: left; padding: 7px 11px;
+      font-size: 0.8rem; color: var(--text-1); background: none; border: none;
+      border-radius: var(--radius); cursor: pointer; font-family: inherit;
+    }
+    .umenu-item:hover { background: var(--row-hover); }
+    .umenu-item.danger { color: #b91c1c; }
+    .umenu-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+    /* ── Bookmark (save) button on job rows ── */
+    .save-btn {
+      background: none; border: none; cursor: pointer; padding: 2px 4px;
+      color: var(--text-3); font-size: 1rem; line-height: 1; flex-shrink: 0;
+      transition: color 0.12s, transform 0.12s;
+    }
+    .save-btn:hover { color: #f59e0b; transform: scale(1.2); }
+    .save-btn.saved { color: #f59e0b; }
+
+    /* ── Saved Jobs panel ── */
+    #saved-panel {
+      max-width: 1100px; margin: 0 auto; padding: 20px;
+    }
+
     /* ── Mobile meta (hidden on desktop) ── */
     .mob-meta { display: none; }
 
     /* ── Tablet (≤900px): shrink location column ── */
     @media (max-width: 900px) {
-      .row-header { grid-template-columns: 1fr 150px 110px 85px 60px 26px; }
-      #tbl-header  { grid-template-columns: 1fr 150px 110px 85px 60px 26px; }
+      .row-header { grid-template-columns: 1fr 150px 110px 85px 60px 20px 26px; }
+      #tbl-header  { grid-template-columns: 1fr 150px 110px 85px 60px 20px 26px; }
     }
 
     /* ── Mobile (≤640px): switch to stacked card layout ── */
@@ -366,7 +431,31 @@
         <span style="font-size:0.95rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;">USG Jobs</span>
         <span style="font-size:0.78rem;color:#64748b;border-left:1px solid #334155;padding-left:10px;margin-left:2px;">University System of Georgia</span>
       </div>
-      <div id="meta-bar" style="font-size:0.75rem;color:#64748b;white-space:nowrap;">Loading&hellip;</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div id="meta-bar" style="font-size:0.75rem;color:#64748b;white-space:nowrap;">Loading&hellip;</div>
+        <!-- Auth button / user menu -->
+        <div id="user-menu-wrap">
+          <button id="btn-signin" onclick="openAuthModal('signin')"
+            style="font-size:0.78rem;font-weight:600;padding:5px 13px;border-radius:var(--radius);border:1px solid #334155;color:#cbd5e1;background:transparent;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all 0.12s;"
+            onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='transparent'">
+            Sign in
+          </button>
+          <button id="btn-user" class="hidden"
+            onclick="toggleUserMenu()"
+            style="font-size:0.78rem;font-weight:600;padding:5px 13px;border-radius:var(--radius);border:1px solid #334155;color:#cbd5e1;background:transparent;cursor:pointer;font-family:inherit;white-space:nowrap;display:none;align-items:center;gap:6px;"
+            onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='transparent'">
+            <span style="width:22px;height:22px;border-radius:50%;background:var(--accent);color:white;font-size:0.72rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;" id="user-avatar">?</span>
+            <span id="user-label">Account</span>
+            <svg style="width:10px;height:10px;color:#64748b;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="user-menu-panel" class="hidden">
+            <button class="umenu-item" onclick="showSavedJobs()">⭐ Saved jobs</button>
+            <button class="umenu-item" onclick="showAlertSettings()">🔔 Email alerts</button>
+            <hr class="umenu-divider">
+            <button class="umenu-item danger" onclick="doSignOut()">Sign out</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -1132,6 +1221,9 @@ function renderCard(job) {
     <div class="row-col col-loc" style="font-size:0.78rem;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${job.location ? esc(job.location) : '—'}</div>
     <div class="row-col col-type" style="display:flex;flex-wrap:wrap;gap:3px;">${typeBadgeHtml}${remoteTag}</div>
     <div class="row-col col-date" style="font-size:0.75rem;color:var(--text-3);white-space:nowrap;">${postedShort}</div>
+    <button class="save-btn${savedJobIds.has(job.id) ? ' saved' : ''}" data-jid="${esc(job.id)}"
+      title="${savedJobIds.has(job.id) ? 'Remove from saved' : 'Save job'}"
+      onclick="toggleSaveJob('${esc(job.id)}', event)">★</button>
     <svg class="chevron" style="width:15px;height:15px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
     </svg>
@@ -1976,6 +2068,362 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, 100) + 'px';
 });
+</script>
+
+<!-- ── Auth Modal ─────────────────────────────────────────────────────────── -->
+<div id="auth-overlay" class="hidden" onclick="handleOverlayClick(event)">
+  <div id="auth-card" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <span style="font-size:1rem;font-weight:700;color:var(--text-1);" id="auth-modal-title">Sign in to USG Jobs</span>
+      <button onclick="closeAuthModal()" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:1.2rem;line-height:1;padding:2px 6px;">✕</button>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;" id="auth-tabs">
+      <button class="auth-tab-btn active" id="auth-tab-signin" onclick="authTab('signin')">Sign in</button>
+      <button class="auth-tab-btn" id="auth-tab-signup" onclick="authTab('signup')">Create account</button>
+    </div>
+
+    <!-- Sign in -->
+    <div id="auth-view-signin">
+      <input class="auth-input" type="email"    id="si-email"    placeholder="Email address" autocomplete="email" />
+      <input class="auth-input" type="password" id="si-password" placeholder="Password"      autocomplete="current-password" />
+      <button class="auth-btn-primary" id="si-btn" onclick="doSignIn()">Sign in</button>
+      <div class="auth-msg" id="si-msg"></div>
+      <p style="text-align:center;margin-top:12px;font-size:0.75rem;color:var(--text-2);">
+        <a href="#" onclick="authTab('reset');return false;" style="color:var(--accent);">Forgot password?</a>
+      </p>
+    </div>
+
+    <!-- Sign up -->
+    <div id="auth-view-signup" class="hidden">
+      <input class="auth-input" type="email"    id="su-email"    placeholder="Email address" autocomplete="email" />
+      <input class="auth-input" type="password" id="su-password" placeholder="Password (min 6 characters)" autocomplete="new-password" />
+      <button class="auth-btn-primary" id="su-btn" onclick="doSignUp()">Create account</button>
+      <div class="auth-msg" id="su-msg"></div>
+      <p style="text-align:center;margin-top:12px;font-size:0.72rem;color:var(--text-3);">
+        By creating an account you agree to our terms of service.
+      </p>
+    </div>
+
+    <!-- Password reset -->
+    <div id="auth-view-reset" class="hidden">
+      <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:12px;">Enter your email and we'll send a reset link.</p>
+      <input class="auth-input" type="email" id="rs-email" placeholder="Email address" autocomplete="email" />
+      <button class="auth-btn-primary" id="rs-btn" onclick="doResetPassword()">Send reset link</button>
+      <div class="auth-msg" id="rs-msg"></div>
+      <p style="text-align:center;margin-top:12px;font-size:0.75rem;">
+        <a href="#" onclick="authTab('signin');return false;" style="color:var(--accent);">Back to sign in</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Saved Jobs panel (replaces main results when active) ───────────────── -->
+<div id="saved-panel" class="hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <h2 style="font-size:0.95rem;font-weight:700;color:var(--text-1);">⭐ Saved Jobs</h2>
+    <button onclick="hideSavedJobs()" style="font-size:0.78rem;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;">← Back to all jobs</button>
+  </div>
+  <div id="saved-results">
+    <p style="color:var(--text-3);font-size:0.85rem;padding:40px 0;text-align:center;">Loading saved jobs…</p>
+  </div>
+</div>
+
+<!-- ── Alert Settings modal ───────────────────────────────────────────────── -->
+<div id="alerts-overlay" class="hidden" onclick="if(event.target===this)closeAlertSettings()">
+  <div style="background:var(--surface);border-radius:8px;box-shadow:var(--shadow-md);width:100%;max-width:460px;padding:28px;margin:auto;position:relative;top:10vh;" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <span style="font-size:1rem;font-weight:700;">🔔 Email alerts</span>
+      <button onclick="closeAlertSettings()" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:1.2rem;padding:2px 6px;">✕</button>
+    </div>
+    <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:16px;">Get a daily digest of new jobs matching your criteria.</p>
+
+    <label style="display:block;font-size:0.78rem;font-weight:600;margin-bottom:4px;color:var(--text-1);">Keywords (comma-separated)</label>
+    <input class="auth-input" type="text" id="al-keywords" placeholder="e.g. professor, data science, nursing" />
+
+    <label style="display:block;font-size:0.78rem;font-weight:600;margin-bottom:4px;color:var(--text-1);">Minimum salary ($)</label>
+    <input class="auth-input" type="number" id="al-minsalary" placeholder="e.g. 50000" min="0" step="1000" />
+
+    <label style="display:block;font-size:0.78rem;font-weight:600;margin-bottom:4px;color:var(--text-1);">Job type</label>
+    <select class="auth-input" id="al-jobtype" style="margin-bottom:16px;">
+      <option value="">Any</option>
+      <option value="Full-Time">Full-Time only</option>
+      <option value="Part-Time">Part-Time only</option>
+    </select>
+
+    <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--text-1);margin-bottom:18px;cursor:pointer;">
+      <input type="checkbox" id="al-active" style="accent-color:var(--accent);" checked />
+      Send daily email alerts
+    </label>
+
+    <button class="auth-btn-primary" onclick="saveAlertPrefs()">Save preferences</button>
+    <div class="auth-msg" id="al-msg" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- ── Supabase + Auth logic ──────────────────────────────────────────────── -->
+<script>
+// ─── CONFIG — replace with your Supabase project values ──────────────────────
+const SUPABASE_URL = 'https://wktobsxgcpcjuahtmgxa.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdG9ic3hnY3BjanVhaHRtZ3hhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwODgxNjYsImV4cCI6MjA5MDY2NDE2Nn0.Q85SNREYpWKK4Kq_t14SSaJvI3X06VVkzixipqhAiyg';
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser  = null;
+let savedJobIds  = new Set();   // job IDs the current user has saved
+
+// ── Auth state listener ───────────────────────────────────────────────────────
+_sb.auth.onAuthStateChange(async (event, session) => {
+  currentUser = session?.user ?? null;
+  updateHeaderUI();
+  if (currentUser) {
+    await loadSavedJobIds();
+    refreshSaveButtons();
+  } else {
+    savedJobIds.clear();
+    refreshSaveButtons();
+  }
+});
+
+// ── Header UI ─────────────────────────────────────────────────────────────────
+function updateHeaderUI() {
+  const btnSignin = document.getElementById('btn-signin');
+  const btnUser   = document.getElementById('btn-user');
+  const avatar    = document.getElementById('user-avatar');
+  const label     = document.getElementById('user-label');
+  if (currentUser) {
+    btnSignin.classList.add('hidden');   btnSignin.style.display = 'none';
+    btnUser.classList.remove('hidden');  btnUser.style.display   = 'inline-flex';
+    const initial = (currentUser.email || '?')[0].toUpperCase();
+    avatar.textContent = initial;
+    label.textContent  = currentUser.email.split('@')[0];
+  } else {
+    btnSignin.classList.remove('hidden'); btnSignin.style.display = '';
+    btnUser.classList.add('hidden');      btnUser.style.display   = 'none';
+    document.getElementById('user-menu-panel').classList.add('hidden');
+  }
+}
+
+function toggleUserMenu() {
+  document.getElementById('user-menu-panel').classList.toggle('hidden');
+}
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('user-menu-wrap');
+  if (wrap && !wrap.contains(e.target))
+    document.getElementById('user-menu-panel').classList.add('hidden');
+});
+
+// ── Auth modal ────────────────────────────────────────────────────────────────
+function openAuthModal(view = 'signin') {
+  authTab(view);
+  document.getElementById('auth-overlay').classList.remove('hidden');
+}
+function closeAuthModal() {
+  document.getElementById('auth-overlay').classList.add('hidden');
+}
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('auth-overlay')) closeAuthModal();
+}
+
+function authTab(view) {
+  ['signin','signup','reset'].forEach(v => {
+    document.getElementById(`auth-view-${v}`).classList.toggle('hidden', v !== view);
+    const tab = document.getElementById(`auth-tab-${v}`);
+    if (tab) tab.classList.toggle('active', v === view);
+  });
+  const titles = { signin: 'Sign in to USG Jobs', signup: 'Create an account', reset: 'Reset password' };
+  document.getElementById('auth-modal-title').textContent = titles[view] || '';
+}
+
+// ── Sign up ───────────────────────────────────────────────────────────────────
+async function doSignUp() {
+  const email = document.getElementById('su-email').value.trim();
+  const pass  = document.getElementById('su-password').value;
+  const btn   = document.getElementById('su-btn');
+  const msg   = document.getElementById('su-msg');
+  if (!email || !pass) { showMsg(msg, 'Please fill in both fields.', 'err'); return; }
+  if (pass.length < 6) { showMsg(msg, 'Password must be at least 6 characters.', 'err'); return; }
+  btn.disabled = true; btn.textContent = 'Creating account…';
+  const { error } = await _sb.auth.signUp({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'Create account';
+  if (error) { showMsg(msg, error.message, 'err'); return; }
+  showMsg(msg, '✓ Account created! You are now signed in.', 'ok');
+  setTimeout(closeAuthModal, 1200);
+}
+
+// ── Sign in ───────────────────────────────────────────────────────────────────
+async function doSignIn() {
+  const email = document.getElementById('si-email').value.trim();
+  const pass  = document.getElementById('si-password').value;
+  const btn   = document.getElementById('si-btn');
+  const msg   = document.getElementById('si-msg');
+  if (!email || !pass) { showMsg(msg, 'Please fill in both fields.', 'err'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { error } = await _sb.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'Sign in';
+  if (error) { showMsg(msg, error.message, 'err'); return; }
+  closeAuthModal();
+}
+
+// ── Sign out ──────────────────────────────────────────────────────────────────
+async function doSignOut() {
+  await _sb.auth.signOut();
+  document.getElementById('user-menu-panel').classList.add('hidden');
+  hideSavedJobs();
+}
+
+// ── Password reset ────────────────────────────────────────────────────────────
+async function doResetPassword() {
+  const email = document.getElementById('rs-email').value.trim();
+  const btn   = document.getElementById('rs-btn');
+  const msg   = document.getElementById('rs-msg');
+  if (!email) { showMsg(msg, 'Please enter your email.', 'err'); return; }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const { error } = await _sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+  btn.disabled = false; btn.textContent = 'Send reset link';
+  if (error) { showMsg(msg, error.message, 'err'); return; }
+  showMsg(msg, '✓ Reset link sent! Check your email.', 'ok');
+}
+
+function showMsg(el, text, type) {
+  el.textContent = text;
+  el.className   = `auth-msg ${type}`;
+}
+
+// ── Saved jobs (DB) ───────────────────────────────────────────────────────────
+async function loadSavedJobIds() {
+  if (!currentUser) return;
+  const { data } = await _sb.from('saved_jobs').select('job_id').eq('user_id', currentUser.id);
+  savedJobIds = new Set((data || []).map(r => r.job_id));
+}
+
+async function toggleSaveJob(jobId, event) {
+  event.stopPropagation();
+  if (!currentUser) { openAuthModal('signin'); return; }
+  const btn = event.currentTarget;
+  if (savedJobIds.has(jobId)) {
+    // Unsave
+    savedJobIds.delete(jobId);
+    btn.classList.remove('saved'); btn.title = 'Save job';
+    await _sb.from('saved_jobs').delete().eq('user_id', currentUser.id).eq('job_id', jobId);
+  } else {
+    // Save
+    savedJobIds.add(jobId);
+    btn.classList.add('saved'); btn.title = 'Remove from saved';
+    const job = allJobs.find(j => j.id === jobId) || {};
+    await _sb.from('saved_jobs').upsert({
+      user_id: currentUser.id, job_id: jobId,
+      job_title: job.title, institution: job.institution,
+      location: job.location, salary: job.salary,
+      posted: job.posted, view_url: job.view,
+    });
+  }
+}
+
+function refreshSaveButtons() {
+  document.querySelectorAll('.save-btn[data-jid]').forEach(btn => {
+    const jid = btn.dataset.jid;
+    btn.classList.toggle('saved', savedJobIds.has(jid));
+    btn.title = savedJobIds.has(jid) ? 'Remove from saved' : 'Save job';
+  });
+}
+
+// ── Saved Jobs panel ──────────────────────────────────────────────────────────
+async function showSavedJobs() {
+  document.getElementById('user-menu-panel').classList.add('hidden');
+  if (!currentUser) { openAuthModal('signin'); return; }
+
+  // Hide main results, show saved panel
+  document.getElementById('results-panel').classList.add('hidden');
+  document.getElementById('empty').classList.add('hidden');
+  document.getElementById('pagination').innerHTML = '';
+  const panel = document.getElementById('saved-panel');
+  panel.classList.remove('hidden');
+  // Scroll to top of panel
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const container = document.getElementById('saved-results');
+  container.innerHTML = '<p style="color:var(--text-3);font-size:0.85rem;padding:40px 0;text-align:center;">Loading…</p>';
+
+  const { data, error } = await _sb.from('saved_jobs')
+    .select('*').eq('user_id', currentUser.id).order('saved_at', { ascending: false });
+
+  if (error || !data?.length) {
+    container.innerHTML = '<p style="color:var(--text-3);font-size:0.85rem;padding:60px 0;text-align:center;">No saved jobs yet.<br><span style="font-size:0.78rem;">Click the ★ on any job to save it.</span></p>';
+    return;
+  }
+
+  // Re-use renderCard for saved jobs (match against allJobs for full data)
+  const cards = data.map(row => {
+    const live = allJobs.find(j => j.id === row.job_id);
+    if (live) return renderCard(live);
+    // Job may be expired — render minimal card from saved snapshot
+    const snapshot = {
+      id: row.job_id, title: row.job_title, institution: row.institution,
+      location: row.location, salary: row.salary, posted: row.posted,
+      view: row.view_url, apply: row.view_url, source: row.institution,
+      summary: '', type: '', employment: '', department: '', remote: false, closes: ''
+    };
+    return `<div style="opacity:0.6;" title="This posting may have closed">${renderCard(snapshot)}</div>`;
+  }).join('');
+
+  container.innerHTML = `<div id="saved-results-panel" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;">${cards}</div>`;
+
+  // Wire expand listeners
+  container.querySelectorAll('.job-row').forEach(row => {
+    row.querySelector('.row-header').addEventListener('click', () => toggleExpand(row.dataset.id, row));
+  });
+  refreshSaveButtons();
+}
+
+function hideSavedJobs() {
+  document.getElementById('saved-panel').classList.add('hidden');
+  applyFilters();   // re-render main list
+}
+
+// ── Alert preferences ─────────────────────────────────────────────────────────
+async function showAlertSettings() {
+  document.getElementById('user-menu-panel').classList.add('hidden');
+  if (!currentUser) { openAuthModal('signin'); return; }
+
+  // Pre-fill existing prefs
+  const { data } = await _sb.from('alert_preferences').select('*').eq('user_id', currentUser.id).maybeSingle();
+  if (data) {
+    document.getElementById('al-keywords').value  = data.keywords || '';
+    document.getElementById('al-minsalary').value = data.min_salary || '';
+    document.getElementById('al-jobtype').value   = data.job_type  || '';
+    document.getElementById('al-active').checked  = data.active !== false;
+  }
+  document.getElementById('al-msg').textContent = '';
+
+  const overlay = document.getElementById('alerts-overlay');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
+  overlay.classList.remove('hidden');
+}
+
+function closeAlertSettings() {
+  document.getElementById('alerts-overlay').classList.add('hidden');
+}
+
+async function saveAlertPrefs() {
+  if (!currentUser) return;
+  const prefs = {
+    user_id:    currentUser.id,
+    keywords:   document.getElementById('al-keywords').value.trim(),
+    min_salary: parseInt(document.getElementById('al-minsalary').value) || 0,
+    job_type:   document.getElementById('al-jobtype').value,
+    active:     document.getElementById('al-active').checked,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await _sb.from('alert_preferences').upsert(prefs);
+  const msg = document.getElementById('al-msg');
+  if (error) showMsg(msg, error.message, 'err');
+  else { showMsg(msg, '✓ Preferences saved!', 'ok'); setTimeout(closeAlertSettings, 1000); }
+}
 </script>
 </body>
 </html>
