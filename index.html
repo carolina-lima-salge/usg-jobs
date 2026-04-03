@@ -292,6 +292,25 @@
     #alerts-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto; }
     #alerts-overlay.hidden { display:none; }
 
+    /* ── Profile / Subscribe modals ── */
+    #profile-overlay, #subscribe-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:500;
+      display:flex; align-items:flex-start; justify-content:center;
+      padding:16px; overflow-y:auto;
+    }
+    #profile-overlay.hidden, #subscribe-overlay.hidden { display:none; }
+    .modal-card {
+      background:var(--surface); border-radius:8px; box-shadow:var(--shadow-md);
+      width:100%; max-width:480px; padding:28px; margin:auto; position:relative; top:8vh;
+    }
+    .modal-title { font-size:1rem; font-weight:700; margin-bottom:18px; }
+    .form-label { display:block; font-size:0.78rem; font-weight:600; color:var(--text-1); margin-bottom:4px; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:0; }
+    .badge-premium { background:#fef9c3; color:#854d0e; font-size:0.68rem; font-weight:700;
+      padding:2px 7px; border-radius:3px; margin-left:6px; }
+    .badge-free { background:#f3f4f6; color:var(--text-2); font-size:0.68rem; font-weight:600;
+      padding:2px 7px; border-radius:3px; margin-left:6px; }
+
     /* ── Auth modal ── */
     #auth-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500;
@@ -455,6 +474,8 @@
           <div id="user-menu-panel" class="hidden">
             <button class="umenu-item" onclick="showSavedJobs()">⭐ Saved jobs</button>
             <button class="umenu-item" onclick="showAlertSettings()">🔔 Email alerts</button>
+            <button class="umenu-item" onclick="showProfileSettings()">👤 My profile</button>
+            <button class="umenu-item" onclick="showSubscribePage()" id="umenu-subscribe" style="display:none;">💎 Upgrade to Premium</button>
             <hr class="umenu-divider">
             <button class="umenu-item danger" onclick="doSignOut()">Sign out</button>
           </div>
@@ -2134,6 +2155,88 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
   </div>
 </div>
 
+<!-- ── Profile Settings modal ─────────────────────────────────────────────── -->
+<div id="profile-overlay" class="hidden" onclick="if(event.target===this)closeProfileSettings()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <span class="modal-title" style="margin-bottom:0;">👤 My Profile <span id="profile-plan-badge" class="badge-free">Free</span></span>
+      <button onclick="closeProfileSettings()" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:1.2rem;padding:2px 6px;">✕</button>
+    </div>
+
+    <div class="form-row" style="margin-bottom:10px;">
+      <div>
+        <label class="form-label">Full name</label>
+        <input class="auth-input" type="text" id="pf-name" placeholder="Carolina Lima" style="margin-bottom:0;" />
+      </div>
+      <div>
+        <label class="form-label">Phone</label>
+        <input class="auth-input" type="tel" id="pf-phone" placeholder="(404) 555-0100" style="margin-bottom:0;" />
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-bottom:10px;">
+      <div>
+        <label class="form-label">Gender</label>
+        <select class="auth-input" id="pf-gender" style="margin-bottom:0;">
+          <option value="">Prefer not to say</option>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+          <option value="nonbinary">Non-binary</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Date of birth</label>
+        <input class="auth-input" type="date" id="pf-dob" style="margin-bottom:0;" />
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <label class="form-label">Location (city, state)</label>
+      <input class="auth-input" type="text" id="pf-location" placeholder="Atlanta, GA" style="margin-bottom:0;" />
+    </div>
+
+    <div style="margin-bottom:18px;">
+      <label class="form-label">Current job title</label>
+      <input class="auth-input" type="text" id="pf-jobtitle" placeholder="e.g. Research Coordinator" style="margin-bottom:0;" />
+    </div>
+
+    <button class="auth-btn-primary" onclick="saveProfile()">Save profile</button>
+    <div class="auth-msg" id="pf-msg" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- ── Subscribe modal ────────────────────────────────────────────────────── -->
+<div id="subscribe-overlay" class="hidden" onclick="if(event.target===this)closeSubscribePage()">
+  <div class="modal-card" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <span class="modal-title" style="margin-bottom:0;">💎 USG Jobs Premium</span>
+      <button onclick="closeSubscribePage()" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:1.2rem;padding:2px 6px;">✕</button>
+    </div>
+    <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:20px;">Unlock all features for one low monthly price.</p>
+
+    <div style="background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:20px;">
+      <div style="font-size:1.4rem;font-weight:800;color:var(--text-1);">$5 <span style="font-size:0.82rem;font-weight:400;color:var(--text-2);">/ month</span></div>
+      <ul style="margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;">
+        <li style="font-size:0.8rem;color:var(--text-1);">✅ Daily email job alerts</li>
+        <li style="font-size:0.8rem;color:var(--text-1);">✅ Save unlimited jobs</li>
+        <li style="font-size:0.8rem;color:var(--text-1);">✅ Advanced salary &amp; location filters</li>
+        <li style="font-size:0.8rem;color:var(--text-1);">✅ Priority support</li>
+      </ul>
+    </div>
+
+    <button class="auth-btn-primary" onclick="startStripeCheckout()" style="margin-bottom:10px;">
+      💳 Pay with Card / Apple Pay / Google Pay
+    </button>
+    <button class="auth-btn-primary" id="paypal-btn-placeholder" onclick="startPayPalCheckout()"
+      style="background:#ffc439;color:#003087;margin-bottom:0;">
+      <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" style="height:16px;vertical-align:middle;margin-right:6px;">
+      Pay with PayPal
+    </button>
+    <div class="auth-msg" id="sub-msg" style="margin-top:8px;"></div>
+  </div>
+</div>
+
 <!-- ── Alert Settings modal ───────────────────────────────────────────────── -->
 <div id="alerts-overlay" class="hidden" onclick="if(event.target===this)closeAlertSettings()">
   <div style="background:var(--surface);border-radius:8px;box-shadow:var(--shadow-md);width:100%;max-width:460px;padding:28px;margin:auto;position:relative;top:10vh;" onclick="event.stopPropagation()">
@@ -2184,9 +2287,11 @@ _sb.auth.onAuthStateChange(async (event, session) => {
   updateHeaderUI();
   if (currentUser) {
     await loadSavedJobIds();
+    await loadProfile();
     refreshSaveButtons();
   } else {
     savedJobIds.clear();
+    userProfile = null;
     refreshSaveButtons();
   }
 });
@@ -2200,9 +2305,10 @@ function updateHeaderUI() {
   if (currentUser) {
     btnSignin.classList.add('hidden');   btnSignin.style.display = 'none';
     btnUser.classList.remove('hidden');  btnUser.style.display   = 'inline-flex';
-    const initial = (currentUser.email || '?')[0].toUpperCase();
+    const name    = userProfile?.full_name || '';
+    const initial = (name || currentUser.email || '?')[0].toUpperCase();
     avatar.textContent = initial;
-    label.textContent  = currentUser.email.split('@')[0];
+    label.textContent  = name ? name.split(' ')[0] : currentUser.email.split('@')[0];
   } else {
     btnSignin.classList.remove('hidden'); btnSignin.style.display = '';
     btnUser.classList.add('hidden');      btnUser.style.display   = 'none';
@@ -2398,6 +2504,155 @@ function hideSavedJobs() {
   document.getElementById('saved-panel').classList.add('hidden');
   applyFilters();   // re-render main list
 }
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+let userProfile = null;
+
+async function loadProfile() {
+  if (!currentUser) return;
+  const { data } = await _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  userProfile = data;
+  // Show "Upgrade" in menu only for free users
+  const subBtn = document.getElementById('umenu-subscribe');
+  if (subBtn) subBtn.style.display = (data?.subscription_status !== 'active') ? '' : 'none';
+  // Update plan badge in profile modal if open
+  updatePlanBadge(data?.subscription_status);
+}
+
+function updatePlanBadge(status) {
+  const badge = document.getElementById('profile-plan-badge');
+  if (!badge) return;
+  if (status === 'active') {
+    badge.textContent = 'Premium'; badge.className = 'badge-premium';
+  } else {
+    badge.textContent = 'Free'; badge.className = 'badge-free';
+  }
+}
+
+async function showProfileSettings() {
+  document.getElementById('user-menu-panel').classList.add('hidden');
+  if (!currentUser) { openAuthModal('signin'); return; }
+  await loadProfile();
+  const d = userProfile || {};
+  document.getElementById('pf-name').value     = d.full_name  || '';
+  document.getElementById('pf-phone').value    = d.phone      || '';
+  document.getElementById('pf-gender').value   = d.gender     || '';
+  document.getElementById('pf-dob').value      = d.date_of_birth ? d.date_of_birth.slice(0,10) : '';
+  document.getElementById('pf-location').value = d.location   || '';
+  document.getElementById('pf-jobtitle').value = d.job_title  || '';
+  document.getElementById('pf-msg').textContent = '';
+  updatePlanBadge(d.subscription_status);
+  document.getElementById('profile-overlay').classList.remove('hidden');
+}
+
+function closeProfileSettings() {
+  document.getElementById('profile-overlay').classList.add('hidden');
+}
+
+async function saveProfile() {
+  if (!currentUser) return;
+  const btn = document.querySelector('#profile-overlay .auth-btn-primary');
+  const msg = document.getElementById('pf-msg');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const payload = {
+    id:            currentUser.id,
+    full_name:     document.getElementById('pf-name').value.trim(),
+    phone:         document.getElementById('pf-phone').value.trim(),
+    gender:        document.getElementById('pf-gender').value,
+    date_of_birth: document.getElementById('pf-dob').value || null,
+    location:      document.getElementById('pf-location').value.trim(),
+    job_title:     document.getElementById('pf-jobtitle').value.trim(),
+    updated_at:    new Date().toISOString(),
+  };
+  const { error } = await _sb.from('profiles').upsert(payload);
+  btn.disabled = false; btn.textContent = 'Save profile';
+  if (error) {
+    msg.textContent = 'Error: ' + error.message; msg.className = 'auth-msg err';
+  } else {
+    msg.textContent = 'Profile saved!'; msg.className = 'auth-msg ok';
+    userProfile = { ...(userProfile || {}), ...payload };
+    // Update avatar initial
+    const initial = payload.full_name ? payload.full_name[0].toUpperCase() : currentUser.email[0].toUpperCase();
+    const av = document.getElementById('user-avatar');
+    if (av) av.textContent = initial;
+  }
+}
+
+// ── Subscribe / Payments ───────────────────────────────────────────────────────
+const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY';  // replace later
+const STRIPE_PRICE_ID        = 'YOUR_STRIPE_PRICE_ID';         // replace later
+const PAYPAL_CLIENT_ID       = 'YOUR_PAYPAL_CLIENT_ID';        // replace later
+
+function showSubscribePage() {
+  document.getElementById('user-menu-panel').classList.add('hidden');
+  if (!currentUser) { openAuthModal('signin'); return; }
+  document.getElementById('sub-msg').textContent = '';
+  document.getElementById('subscribe-overlay').classList.remove('hidden');
+}
+function closeSubscribePage() {
+  document.getElementById('subscribe-overlay').classList.add('hidden');
+}
+
+async function startStripeCheckout() {
+  if (!currentUser) { openAuthModal('signin'); return; }
+  const msg = document.getElementById('sub-msg');
+  if (STRIPE_PUBLISHABLE_KEY === 'YOUR_STRIPE_PUBLISHABLE_KEY') {
+    msg.textContent = 'Stripe not configured yet — coming soon!';
+    msg.className = 'auth-msg err'; return;
+  }
+  msg.textContent = 'Redirecting to checkout…'; msg.className = 'auth-msg ok';
+  // Calls Supabase Edge Function to create a Stripe Checkout session
+  const { data, error } = await _sb.functions.invoke('create-stripe-session', {
+    body: { price_id: STRIPE_PRICE_ID, user_id: currentUser.id, email: currentUser.email,
+            success_url: window.location.href + '?payment=success',
+            cancel_url:  window.location.href + '?payment=cancelled' }
+  });
+  if (error || !data?.url) {
+    msg.textContent = 'Could not start checkout: ' + (error?.message || 'unknown error');
+    msg.className = 'auth-msg err'; return;
+  }
+  window.location.href = data.url;
+}
+
+async function startPayPalCheckout() {
+  if (!currentUser) { openAuthModal('signin'); return; }
+  const msg = document.getElementById('sub-msg');
+  if (PAYPAL_CLIENT_ID === 'YOUR_PAYPAL_CLIENT_ID') {
+    msg.textContent = 'PayPal not configured yet — coming soon!';
+    msg.className = 'auth-msg err'; return;
+  }
+  msg.textContent = 'Redirecting to PayPal…'; msg.className = 'auth-msg ok';
+  const { data, error } = await _sb.functions.invoke('create-paypal-session', {
+    body: { user_id: currentUser.id, email: currentUser.email,
+            return_url: window.location.href + '?payment=success',
+            cancel_url: window.location.href + '?payment=cancelled' }
+  });
+  if (error || !data?.url) {
+    msg.textContent = 'Could not start PayPal: ' + (error?.message || 'unknown error');
+    msg.className = 'auth-msg err'; return;
+  }
+  window.location.href = data.url;
+}
+
+// Handle return from payment gateway
+(function checkPaymentReturn() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('payment') === 'success') {
+    setTimeout(async () => {
+      await loadProfile();
+      const status = userProfile?.subscription_status;
+      if (status === 'active') {
+        alert('🎉 Welcome to Premium! Your subscription is now active.');
+      } else {
+        alert('Payment received! Your account will be upgraded shortly.');
+      }
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+    }, 1500);
+  } else if (params.get('payment') === 'cancelled') {
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+  }
+})();
 
 // ── Alert preferences ─────────────────────────────────────────────────────────
 async function showAlertSettings() {
