@@ -288,6 +288,10 @@
     .cv-browse-label { color: var(--accent); font-weight: 500; cursor: pointer; }
     .cv-browse-label:hover { text-decoration: underline; }
 
+    /* ── Alerts modal ── */
+    #alerts-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto; }
+    #alerts-overlay.hidden { display:none; }
+
     /* ── Auth modal ── */
     #auth-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 500;
@@ -2309,18 +2313,28 @@ async function toggleSaveJob(jobId, event) {
     // Unsave
     savedJobIds.delete(jobId);
     btn.classList.remove('saved'); btn.title = 'Save job';
-    await _sb.from('saved_jobs').delete().eq('user_id', currentUser.id).eq('job_id', jobId);
+    const { error } = await _sb.from('saved_jobs').delete().eq('user_id', currentUser.id).eq('job_id', jobId);
+    if (error) {
+      // Revert
+      savedJobIds.add(jobId); btn.classList.add('saved'); btn.title = 'Remove from saved';
+      alert('Could not remove job. Make sure the Supabase tables are created.');
+    }
   } else {
     // Save
     savedJobIds.add(jobId);
     btn.classList.add('saved'); btn.title = 'Remove from saved';
     const job = allJobs.find(j => j.id === jobId) || {};
-    await _sb.from('saved_jobs').upsert({
+    const { error } = await _sb.from('saved_jobs').upsert({
       user_id: currentUser.id, job_id: jobId,
       job_title: job.title, institution: job.institution,
       location: job.location, salary: job.salary,
       posted: job.posted, view_url: job.view,
     });
+    if (error) {
+      // Revert
+      savedJobIds.delete(jobId); btn.classList.remove('saved'); btn.title = 'Save job';
+      alert('Could not save job. Make sure the Supabase tables are created.\n\nError: ' + error.message);
+    }
   }
 }
 
@@ -2401,12 +2415,13 @@ async function showAlertSettings() {
   document.getElementById('al-msg').textContent = '';
 
   const overlay = document.getElementById('alerts-overlay');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
   overlay.classList.remove('hidden');
 }
 
 function closeAlertSettings() {
-  document.getElementById('alerts-overlay').classList.add('hidden');
+  const overlay = document.getElementById('alerts-overlay');
+  overlay.style.cssText = '';
+  overlay.classList.add('hidden');
 }
 
 async function saveAlertPrefs() {
