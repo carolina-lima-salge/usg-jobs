@@ -2228,11 +2228,7 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
     <button class="auth-btn-primary" onclick="startStripeCheckout()" style="margin-bottom:10px;">
       💳 Pay with Card / Apple Pay / Google Pay
     </button>
-    <button class="auth-btn-primary" id="paypal-btn-placeholder" onclick="startPayPalCheckout()"
-      style="background:#ffc439;color:#003087;margin-bottom:0;">
-      <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" style="height:16px;vertical-align:middle;margin-right:6px;">
-      Pay with PayPal
-    </button>
+    <div id="paypal-button-container" style="margin-top:4px;min-height:45px;"></div>
     <div class="auth-msg" id="sub-msg" style="margin-top:8px;"></div>
   </div>
 </div>
@@ -2579,15 +2575,16 @@ async function saveProfile() {
 }
 
 // ── Subscribe / Payments ───────────────────────────────────────────────────────
-const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY';  // replace later
-const STRIPE_PRICE_ID        = 'YOUR_STRIPE_PRICE_ID';         // replace later
-const PAYPAL_CLIENT_ID       = 'YOUR_PAYPAL_CLIENT_ID';        // replace later
+const STRIPE_PUBLISHABLE_KEY = 'pk_live_51TI5unJkd2cZYOPUjfN11KS61B1KvgG2JQcrRcVlbPHeDl2UcENpRii7pn659XNHEU5JPzbcR3jNArGpicBbChgY00DZFUpAtx';
+const STRIPE_PRICE_ID        = 'price_1TIDP7Jkd2cZYOPUeJ0c2lVG';
+const PAYPAL_CLIENT_ID       = 'AaycB4vEQkS2S0b2VxQiS9JYdEDxJNYYCAQg3ZsPOjoDjllBwx3rX7e6ivikQnX2wJv0agftO3YXhywi';
 
 function showSubscribePage() {
   document.getElementById('user-menu-panel').classList.add('hidden');
   if (!currentUser) { openAuthModal('signin'); return; }
   document.getElementById('sub-msg').textContent = '';
   document.getElementById('subscribe-overlay').classList.remove('hidden');
+  loadPayPalSDK();   // load & render PayPal button the first time
 }
 function closeSubscribePage() {
   document.getElementById('subscribe-overlay').classList.add('hidden');
@@ -2614,24 +2611,55 @@ async function startStripeCheckout() {
   window.location.href = data.url;
 }
 
-async function startPayPalCheckout() {
-  if (!currentUser) { openAuthModal('signin'); return; }
-  const msg = document.getElementById('sub-msg');
-  if (PAYPAL_CLIENT_ID === 'YOUR_PAYPAL_CLIENT_ID') {
-    msg.textContent = 'PayPal not configured yet — coming soon!';
-    msg.className = 'auth-msg err'; return;
-  }
-  msg.textContent = 'Redirecting to PayPal…'; msg.className = 'auth-msg ok';
-  const { data, error } = await _sb.functions.invoke('create-paypal-session', {
-    body: { user_id: currentUser.id, email: currentUser.email,
-            return_url: window.location.href + '?payment=success',
-            cancel_url: window.location.href + '?payment=cancelled' }
-  });
-  if (error || !data?.url) {
-    msg.textContent = 'Could not start PayPal: ' + (error?.message || 'unknown error');
-    msg.className = 'auth-msg err'; return;
-  }
-  window.location.href = data.url;
+// ── PayPal SDK loader ─────────────────────────────────────────────────────────
+// PAYPAL_PLAN_ID: create a Subscription Plan in PayPal Dashboard → Catalog → Plans
+// then paste the plan ID (starts with P-) here.
+const PAYPAL_PLAN_ID = 'YOUR_PAYPAL_PLAN_ID';
+
+let _paypalLoaded = false;
+function loadPayPalSDK() {
+  if (_paypalLoaded || document.getElementById('paypal-sdk')) return;
+  _paypalLoaded = true;
+  const s = document.createElement('script');
+  s.id  = 'paypal-sdk';
+  s.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription`;
+  s.setAttribute('data-sdk-integration-source', 'button-factory');
+  s.onload = renderPayPalButton;
+  document.head.appendChild(s);
+}
+
+function renderPayPalButton() {
+  const container = document.getElementById('paypal-button-container');
+  if (!container || !window.paypal) return;
+  container.innerHTML = '';
+  window.paypal.Buttons({
+    style: { shape: 'rect', color: 'gold', layout: 'horizontal', label: 'subscribe' },
+    createSubscription: (data, actions) => {
+      if (PAYPAL_PLAN_ID === 'YOUR_PAYPAL_PLAN_ID') {
+        document.getElementById('sub-msg').textContent = 'PayPal plan not configured yet.';
+        document.getElementById('sub-msg').className = 'auth-msg err';
+        return Promise.reject(new Error('No plan ID'));
+      }
+      return actions.subscription.create({ plan_id: PAYPAL_PLAN_ID });
+    },
+    onApprove: async (data) => {
+      // Mark user as subscribed in Supabase
+      if (currentUser) {
+        await _sb.from('profiles').update({
+          subscription_status: 'active',
+          paypal_sub_id: data.subscriptionID,
+          updated_at: new Date().toISOString(),
+        }).eq('id', currentUser.id);
+        await loadProfile();
+      }
+      closeSubscribePage();
+      alert('🎉 Welcome to Premium! Your PayPal subscription is now active.');
+    },
+    onError: (err) => {
+      document.getElementById('sub-msg').textContent = 'PayPal error: ' + err;
+      document.getElementById('sub-msg').className = 'auth-msg err';
+    },
+  }).render('#paypal-button-container');
 }
 
 // Handle return from payment gateway
