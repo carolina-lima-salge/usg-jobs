@@ -2676,8 +2676,9 @@ async function loadProfile() {
   if (subBtn) subBtn.style.display = isPro ? 'none' : '';
   // Update plan badge in profile modal if open
   updatePlanBadge(data?.subscription_status, data?.subscription_tier);
-  // Re-evaluate free sample now that profile is known
+  // Re-evaluate free sample and re-render jobs now that tier is known
   updateFreeSample();
+  if (allJobs.length > 0) applyFilters();
 }
 
 function updatePlanBadge(status, tier) {
