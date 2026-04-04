@@ -2296,6 +2296,29 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
 
     <button class="auth-btn-primary" onclick="saveProfile()">Save profile</button>
     <div class="auth-msg" id="pf-msg" style="margin-top:8px;"></div>
+
+    <!-- Subscription management (shown only for paid users) -->
+    <div id="pf-sub-section" class="hidden" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+      <div style="font-size:0.78rem;font-weight:600;color:var(--text-1);margin-bottom:8px;">Subscription</div>
+      <div style="font-size:0.8rem;color:var(--text-2);margin-bottom:12px;">
+        To stop future charges, cancel directly with your payment provider:
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <a href="https://billing.stripe.com" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:var(--radius);font-size:0.78rem;font-weight:600;color:var(--text-1);background:var(--bg);border:1px solid var(--border-strong);text-decoration:none;">
+          💳 Manage Stripe billing
+        </a>
+        <a href="https://www.paypal.com/myaccount/autopay" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:var(--radius);font-size:0.78rem;font-weight:600;color:var(--text-1);background:var(--bg);border:1px solid var(--border-strong);text-decoration:none;">
+          🅿 Manage PayPal billing
+        </a>
+      </div>
+      <button onclick="confirmCancelSubscription()"
+        style="font-size:0.78rem;color:#b91c1c;background:none;border:none;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline;">
+        Cancel subscription &amp; downgrade to Free
+      </button>
+      <div class="auth-msg" id="pf-cancel-msg" style="margin-top:6px;"></div>
+    </div>
   </div>
 </div>
 
@@ -2684,7 +2707,43 @@ async function showProfileSettings() {
   document.getElementById('pf-jobtitle').value = d.job_title  || '';
   document.getElementById('pf-msg').textContent = '';
   updatePlanBadge(d.subscription_status, d.subscription_tier);
+  // Show cancel section only for active subscribers
+  const subSection = document.getElementById('pf-sub-section');
+  if (subSection) {
+    subSection.classList.toggle('hidden', d?.subscription_status !== 'active');
+    document.getElementById('pf-cancel-msg').textContent = '';
+  }
   document.getElementById('profile-overlay').classList.remove('hidden');
+}
+
+async function confirmCancelSubscription() {
+  if (!currentUser) return;
+  const ok = confirm(
+    'This will remove your paid access immediately.\n\n' +
+    'Make sure to also cancel in Stripe or PayPal to stop future charges.\n\n' +
+    'Continue?'
+  );
+  if (!ok) return;
+  const msg = document.getElementById('pf-cancel-msg');
+  msg.textContent = 'Cancelling…'; msg.className = 'auth-msg';
+  const { error } = await _sb.from('profiles').update({
+    subscription_status: null,
+    subscription_tier:   null,
+    paypal_sub_id:       null,
+    updated_at:          new Date().toISOString(),
+  }).eq('id', currentUser.id);
+  if (error) {
+    msg.textContent = 'Error: ' + error.message; msg.className = 'auth-msg err';
+  } else {
+    userProfile = { ...(userProfile || {}), subscription_status: null, subscription_tier: null };
+    updatePlanBadge(null, null);
+    updateFreeSample();
+    applyFilters();
+    updateHeaderUI();
+    document.getElementById('pf-sub-section').classList.add('hidden');
+    msg.textContent = ''; msg.className = 'auth-msg';
+    alert('Your subscription has been cancelled. Remember to also cancel in Stripe or PayPal to stop future charges.');
+  }
 }
 
 function closeProfileSettings() {
