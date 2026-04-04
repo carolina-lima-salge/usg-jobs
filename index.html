@@ -2305,10 +2305,15 @@ function updateHeaderUI() {
     const initial = (name || currentUser.email || '?')[0].toUpperCase();
     avatar.textContent = initial;
     label.textContent  = name ? name.split(' ')[0] : currentUser.email.split('@')[0];
+    // Show upgrade button for non-premium users — default to visible, hide only if confirmed premium
+    const subBtn = document.getElementById('umenu-subscribe');
+    if (subBtn) subBtn.style.display = (userProfile?.subscription_status === 'active') ? 'none' : '';
   } else {
     btnSignin.classList.remove('hidden'); btnSignin.style.display = '';
     btnUser.classList.add('hidden');      btnUser.style.display   = 'none';
     document.getElementById('user-menu-panel').classList.add('hidden');
+    const subBtn = document.getElementById('umenu-subscribe');
+    if (subBtn) subBtn.style.display = 'none';
   }
 }
 
@@ -2375,7 +2380,9 @@ async function doSignIn() {
 
 // ── Sign out ──────────────────────────────────────────────────────────────────
 async function doSignOut() {
-  await _sb.auth.signOut();
+  try { await _sb.auth.signOut(); } catch (_) {}
+  // Clear all Supabase session keys from localStorage then reload
+  Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
   window.location.reload();
 }
 
