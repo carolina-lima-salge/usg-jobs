@@ -1042,7 +1042,7 @@ let freeSampleSet = null;  // Set<jobId> — 50 random jobs for free users
 function updateFreeSample() {
   const tier = getUserTier();
   if (tier !== 'free') {
-    freeSampleSet = null;   // paid users see everything
+    freeSampleSet = null;   // paid/pending users see everything
     return;
   }
   // Build (or keep) the session-consistent random sample
@@ -2437,6 +2437,7 @@ _sb.auth.onAuthStateChange(async (event, session) => {
   currentUser = session?.user ?? null;
   updateHeaderUI();
   if (currentUser) {
+    userProfile = undefined;  // mark as pending until loadProfile completes
     await loadSavedJobIds();
     await loadProfile();
     refreshSaveButtons();
@@ -2666,7 +2667,7 @@ function hideSavedJobs() {
 }
 
 // ── Profile ───────────────────────────────────────────────────────────────────
-let userProfile = null;
+let userProfile = undefined;  // undefined = not yet fetched; null = fetched, no row
 
 async function loadProfile() {
   if (!currentUser) return;
@@ -2794,6 +2795,7 @@ let _selectedTier = 'basic'; // 'free' | 'basic' | 'pro'
 
 function getUserTier() {
   if (!currentUser) return 'free';
+  if (userProfile === undefined) return 'pending'; // profile not loaded yet — don't restrict
   if (userProfile?.subscription_status === 'active') {
     return userProfile?.subscription_tier || 'basic';
   }
