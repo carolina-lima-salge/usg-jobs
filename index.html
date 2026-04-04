@@ -1060,6 +1060,9 @@ function onSearchInput() {
 }
 
 function applyFilters() {
+  // Always sync free-sample with current tier before filtering
+  updateFreeSample();
+
   const q          = document.getElementById('search').value.trim().toLowerCase();
   const type       = document.getElementById('f-type').value.toLowerCase();
   const employment  = document.getElementById('f-employment').value.toLowerCase();
@@ -1170,9 +1173,8 @@ function applyFilters() {
   }
 
   // Free-tier: restrict to the 50-job random sample
-  if (getUserTier() === 'free') {
-    updateFreeSample();
-    if (freeSampleSet) filtered = filtered.filter(j => freeSampleSet.has(j.id));
+  if (getUserTier() === 'free' && freeSampleSet) {
+    filtered = filtered.filter(j => freeSampleSet.has(j.id));
   }
 
   currentPage = 1;
