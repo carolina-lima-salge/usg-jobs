@@ -2380,9 +2380,9 @@ async function doSignIn() {
 
 // ── Sign out ──────────────────────────────────────────────────────────────────
 function doSignOut() {
-  _sb.auth.signOut().catch(() => {});   // fire-and-forget, never block on network
-  Object.keys(localStorage).forEach(k => localStorage.removeItem(k));
-  window.location.reload();
+  _sb.auth.signOut().catch(() => {});
+  try { localStorage.clear(); sessionStorage.clear(); } catch (_) {}
+  window.location.replace(window.location.pathname);
 }
 
 // ── Password reset ────────────────────────────────────────────────────────────
@@ -2601,21 +2601,30 @@ async function startStripeCheckout() {
   msg.textContent = 'Redirecting to checkout…'; msg.className = 'auth-msg ok';
   try {
     const baseUrl = window.location.origin + window.location.pathname;
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Request timed out — please try again')), 15000));
-    const invokeResult = _sb.functions.invoke('create-stripe-session', {
-      body: { price_id: STRIPE_PRICE_ID, user_id: currentUser.id, email: currentUser.email,
-              success_url: baseUrl + '?payment=success',
-              cancel_url:  baseUrl + '?payment=cancelled' }
-    });
-    const { data, error } = await Promise.race([invokeResult, timeout]);
-    if (error) {
-      let errMsg = error.message;
-      try { const body = await error.context?.json(); if (body?.error) errMsg = body.error; } catch {}
-      throw new Error(errMsg);
-    }
-    if (!data?.url) throw new Error('No checkout URL returned from server');
-    window.location.assign(data.url);
+    const session = await _sb.auth.getSession();
+    const token   = session?.data?.session?.access_token || SUPABASE_KEY;
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/create-stripe-session`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey':        SUPABASE_KEY,
+        },
+        body: JSON.stringify({
+          price_id:    STRIPE_PRICE_ID,
+          user_id:     currentUser.id,
+          email:       currentUser.email,
+          success_url: baseUrl + '?payment=success',
+          cancel_url:  baseUrl + '?payment=cancelled',
+        }),
+      }
+    );
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || `Server error ${res.status}`);
+    if (!result.url) throw new Error('No checkout URL returned');
+    window.location.assign(result.url);
   } catch (err) {
     msg.textContent = 'Could not start checkout: ' + err.message;
     msg.className = 'auth-msg err';
