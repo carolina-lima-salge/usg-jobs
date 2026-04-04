@@ -2376,8 +2376,7 @@ async function doSignIn() {
 // ── Sign out ──────────────────────────────────────────────────────────────────
 async function doSignOut() {
   await _sb.auth.signOut();
-  document.getElementById('user-menu-panel').classList.add('hidden');
-  hideSavedJobs();
+  window.location.reload();
 }
 
 // ── Password reset ────────────────────────────────────────────────────────────
@@ -2593,29 +2592,26 @@ function closeSubscribePage() {
 async function startStripeCheckout() {
   if (!currentUser) { openAuthModal('signin'); return; }
   const msg = document.getElementById('sub-msg');
-  if (STRIPE_PUBLISHABLE_KEY === 'YOUR_STRIPE_PUBLISHABLE_KEY') {
-    msg.textContent = 'Stripe not configured yet — coming soon!';
-    msg.className = 'auth-msg err'; return;
-  }
   msg.textContent = 'Redirecting to checkout…'; msg.className = 'auth-msg ok';
-  const baseUrl = window.location.origin + window.location.pathname;
-  const { data, error } = await _sb.functions.invoke('create-stripe-session', {
-    body: { price_id: STRIPE_PRICE_ID, user_id: currentUser.id, email: currentUser.email,
-            success_url: baseUrl + '?payment=success',
-            cancel_url:  baseUrl + '?payment=cancelled' }
-  });
-  if (error) {
-    // Extract actual error body from Supabase FunctionsHttpError
-    let errMsg = error.message;
-    try { const body = await error.context?.json(); if (body?.error) errMsg = body.error; } catch {}
-    msg.textContent = 'Could not start checkout: ' + errMsg;
-    msg.className = 'auth-msg err'; return;
+  try {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const { data, error } = await _sb.functions.invoke('create-stripe-session', {
+      body: { price_id: STRIPE_PRICE_ID, user_id: currentUser.id, email: currentUser.email,
+              success_url: baseUrl + '?payment=success',
+              cancel_url:  baseUrl + '?payment=cancelled' }
+    });
+    if (error) {
+      let errMsg = error.message;
+      try { const body = await error.context?.json(); if (body?.error) errMsg = body.error; } catch {}
+      throw new Error(errMsg);
+    }
+    if (!data?.url) throw new Error('No checkout URL returned from server');
+    // Redirect to Stripe Checkout
+    window.location.assign(data.url);
+  } catch (err) {
+    msg.textContent = 'Could not start checkout: ' + err.message;
+    msg.className = 'auth-msg err';
   }
-  if (!data?.url) {
-    msg.textContent = 'Could not start checkout: no redirect URL returned';
-    msg.className = 'auth-msg err'; return;
-  }
-  window.location.href = data.url;
 }
 
 // ── PayPal SDK loader ─────────────────────────────────────────────────────────
