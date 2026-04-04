@@ -2595,40 +2595,10 @@ function closeSubscribePage() {
   document.getElementById('subscribe-overlay').classList.add('hidden');
 }
 
-async function startStripeCheckout() {
+function startStripeCheckout() {
   if (!currentUser) { openAuthModal('signin'); return; }
-  const msg = document.getElementById('sub-msg');
-  msg.textContent = 'Redirecting to checkout…'; msg.className = 'auth-msg ok';
-  try {
-    const baseUrl = window.location.origin + window.location.pathname;
-    const session = await _sb.auth.getSession();
-    const token   = session?.data?.session?.access_token || SUPABASE_KEY;
-    const res = await fetch(
-      `${SUPABASE_URL}/functions/v1/create-stripe-session`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Bearer ${token}`,
-          'apikey':        SUPABASE_KEY,
-        },
-        body: JSON.stringify({
-          price_id:    STRIPE_PRICE_ID,
-          user_id:     currentUser.id,
-          email:       currentUser.email,
-          success_url: baseUrl + '?payment=success',
-          cancel_url:  baseUrl + '?payment=cancelled',
-        }),
-      }
-    );
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || `Server error ${res.status}`);
-    if (!result.url) throw new Error('No checkout URL returned');
-    window.location.assign(result.url);
-  } catch (err) {
-    msg.textContent = 'Could not start checkout: ' + err.message;
-    msg.className = 'auth-msg err';
-  }
+  const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/14A8wQe1AgKD3o1dnVds400';
+  window.location.assign(STRIPE_PAYMENT_LINK);
 }
 
 // ── PayPal SDK loader ─────────────────────────────────────────────────────────
