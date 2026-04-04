@@ -1172,8 +1172,8 @@ function applyFilters() {
     arrow.textContent = sort === 'newest' ? '↓' : sort === 'oldest' ? '↑' : '↕';
   }
 
-  // Free-tier: restrict to the 50-job random sample
-  if (getUserTier() === 'free' && freeSampleSet) {
+  // Free-tier: restrict anonymous visitors to 50-job random sample
+  if (!currentUser && freeSampleSet) {
     filtered = filtered.filter(j => freeSampleSet.has(j.id));
   }
 
@@ -1201,7 +1201,7 @@ function render() {
   // Show/hide free-tier upgrade banner
   const freeBanner = document.getElementById('free-tier-banner');
   if (freeBanner) {
-    if (getUserTier() === 'free' && allJobs.length > 50) {
+    if (!currentUser && allJobs.length > 50) {
       document.getElementById('free-tier-total').textContent = allJobs.length.toLocaleString() + ' total';
       freeBanner.classList.remove('hidden');
     } else {
