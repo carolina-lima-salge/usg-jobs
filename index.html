@@ -2379,10 +2379,9 @@ async function doSignIn() {
 }
 
 // ── Sign out ──────────────────────────────────────────────────────────────────
-async function doSignOut() {
-  try { await _sb.auth.signOut(); } catch (_) {}
-  // Clear all Supabase session keys from localStorage then reload
-  Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+function doSignOut() {
+  _sb.auth.signOut().catch(() => {});   // fire-and-forget, never block on network
+  Object.keys(localStorage).forEach(k => localStorage.removeItem(k));
   window.location.reload();
 }
 
@@ -2602,18 +2601,20 @@ async function startStripeCheckout() {
   msg.textContent = 'Redirecting to checkout…'; msg.className = 'auth-msg ok';
   try {
     const baseUrl = window.location.origin + window.location.pathname;
-    const { data, error } = await _sb.functions.invoke('create-stripe-session', {
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out — please try again')), 15000));
+    const invokeResult = _sb.functions.invoke('create-stripe-session', {
       body: { price_id: STRIPE_PRICE_ID, user_id: currentUser.id, email: currentUser.email,
               success_url: baseUrl + '?payment=success',
               cancel_url:  baseUrl + '?payment=cancelled' }
     });
+    const { data, error } = await Promise.race([invokeResult, timeout]);
     if (error) {
       let errMsg = error.message;
       try { const body = await error.context?.json(); if (body?.error) errMsg = body.error; } catch {}
       throw new Error(errMsg);
     }
     if (!data?.url) throw new Error('No checkout URL returned from server');
-    // Redirect to Stripe Checkout
     window.location.assign(data.url);
   } catch (err) {
     msg.textContent = 'Could not start checkout: ' + err.message;
