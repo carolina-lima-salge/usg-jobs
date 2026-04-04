@@ -2598,14 +2598,21 @@ async function startStripeCheckout() {
     msg.className = 'auth-msg err'; return;
   }
   msg.textContent = 'Redirecting to checkout…'; msg.className = 'auth-msg ok';
-  // Calls Supabase Edge Function to create a Stripe Checkout session
+  const baseUrl = window.location.origin + window.location.pathname;
   const { data, error } = await _sb.functions.invoke('create-stripe-session', {
     body: { price_id: STRIPE_PRICE_ID, user_id: currentUser.id, email: currentUser.email,
-            success_url: window.location.href + '?payment=success',
-            cancel_url:  window.location.href + '?payment=cancelled' }
+            success_url: baseUrl + '?payment=success',
+            cancel_url:  baseUrl + '?payment=cancelled' }
   });
-  if (error || !data?.url) {
-    msg.textContent = 'Could not start checkout: ' + (error?.message || 'unknown error');
+  if (error) {
+    // Extract actual error body from Supabase FunctionsHttpError
+    let errMsg = error.message;
+    try { const body = await error.context?.json(); if (body?.error) errMsg = body.error; } catch {}
+    msg.textContent = 'Could not start checkout: ' + errMsg;
+    msg.className = 'auth-msg err'; return;
+  }
+  if (!data?.url) {
+    msg.textContent = 'Could not start checkout: no redirect URL returned';
     msg.className = 'auth-msg err'; return;
   }
   window.location.href = data.url;
