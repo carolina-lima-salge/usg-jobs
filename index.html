@@ -680,7 +680,7 @@
   <!-- Free-tier upgrade banner (hidden for paid users) -->
   <div id="free-tier-banner" class="hidden">
     <div>
-      <span style="font-weight:700;font-size:0.85rem;color:#92400e;">Showing 50 of <span id="free-tier-total">?</span> jobs</span>
+      <span style="font-weight:700;font-size:0.85rem;color:#92400e;">Showing 50 of <span id="free-tier-total">many</span> jobs</span>
       <span style="font-size:0.82rem;color:#b45309;margin-left:8px;">Upgrade to see all listings</span>
     </div>
     <button onclick="showSubscribePage()" style="background:#f59e0b;color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;flex-shrink:0;">
@@ -1202,7 +1202,7 @@ function render() {
   const freeBanner = document.getElementById('free-tier-banner');
   if (freeBanner) {
     if (getUserTier() === 'free' && allJobs.length > 50) {
-      document.getElementById('free-tier-total').textContent = allJobs.length.toLocaleString();
+      document.getElementById('free-tier-total').textContent = allJobs.length.toLocaleString() + ' total';
       freeBanner.classList.remove('hidden');
     } else {
       freeBanner.classList.add('hidden');
