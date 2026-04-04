@@ -310,6 +310,42 @@
       padding:2px 7px; border-radius:3px; margin-left:6px; }
     .badge-free { background:#f3f4f6; color:var(--text-2); font-size:0.68rem; font-weight:600;
       padding:2px 7px; border-radius:3px; margin-left:6px; }
+    .badge-basic { background:#dbeafe; color:#1e40af; font-size:0.68rem; font-weight:700;
+      padding:2px 7px; border-radius:3px; margin-left:6px; }
+    .badge-pro   { background:#ede9fe; color:#6d28d9; font-size:0.68rem; font-weight:700;
+      padding:2px 7px; border-radius:3px; margin-left:6px; }
+
+    /* ── Tier cards (subscribe modal) ── */
+    .tier-card {
+      border: 2px solid var(--border); border-radius: 8px; padding: 16px 14px;
+      cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+      position: relative; user-select: none;
+    }
+    .tier-card:hover { border-color: var(--accent); }
+    .tier-card.tier-selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .tier-card.tier-popular::before {
+      content: 'Most Popular'; position: absolute; top: -10px; left: 50%;
+      transform: translateX(-50%); background: var(--accent); color: white;
+      font-size: 0.63rem; font-weight: 700; padding: 2px 9px; border-radius: 9px;
+      white-space: nowrap; letter-spacing: 0.03em;
+    }
+    .tier-price { font-size: 1.5rem; font-weight: 800; color: var(--text-1); margin: 6px 0 10px; }
+    .tier-price span { font-size: 0.8rem; font-weight: 400; color: var(--text-2); }
+    .tier-feature {
+      font-size: 0.78rem; color: var(--text-1); padding: 3px 0;
+      display: flex; align-items: flex-start; gap: 6px;
+    }
+    .tier-feature.muted { color: var(--text-3); }
+
+    /* ── Free tier upgrade banner ── */
+    #free-tier-banner {
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
+      padding: 11px 16px; margin-bottom: 14px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
 
     /* ── Auth modal ── */
     #auth-overlay {
@@ -641,6 +677,17 @@
 <!-- ── Results ──────────────────────────────────────────────────────────────── -->
 <main style="max-width:1100px;margin:0 auto;padding:20px;">
 
+  <!-- Free-tier upgrade banner (hidden for paid users) -->
+  <div id="free-tier-banner" class="hidden">
+    <div>
+      <span style="font-weight:700;font-size:0.85rem;color:#92400e;">Showing 50 of <span id="free-tier-total">?</span> jobs</span>
+      <span style="font-size:0.82rem;color:#b45309;margin-left:8px;">Upgrade to see all listings</span>
+    </div>
+    <button onclick="showSubscribePage()" style="background:#f59e0b;color:white;border:none;border-radius:var(--radius);padding:6px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;flex-shrink:0;">
+      View plans ↗
+    </button>
+  </div>
+
   <!-- Loading state -->
   <div id="loading" style="text-align:center;padding:80px 0;color:var(--text-3);">
     <svg class="animate-spin" style="display:inline-block;width:28px;height:28px;margin-bottom:10px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -906,6 +953,9 @@ async function loadData() {
     // Try loading pre-computed embeddings (resolves silently if file absent)
     tryLoadEmbeddings();
 
+    // Set up free-tier sample now that jobs are loaded
+    updateFreeSample();
+
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
 
@@ -986,6 +1036,22 @@ function parseSalaryNum(job) {
 }
 
 // ── Filtering ──────────────────────────────────────────────────────────────────
+// ── Free-tier job sample ────────────────────────────────────────────────────────
+let freeSampleSet = null;  // Set<jobId> — 50 random jobs for free users
+
+function updateFreeSample() {
+  const tier = getUserTier();
+  if (tier !== 'free') {
+    freeSampleSet = null;   // paid users see everything
+    return;
+  }
+  // Build (or keep) the session-consistent random sample
+  if (!freeSampleSet && allJobs.length > 0) {
+    const shuffled = [...allJobs].sort(() => Math.random() - 0.5);
+    freeSampleSet  = new Set(shuffled.slice(0, 50).map(j => j.id));
+  }
+}
+
 let searchTimer = null;
 
 function onSearchInput() {
@@ -1103,6 +1169,12 @@ function applyFilters() {
     arrow.textContent = sort === 'newest' ? '↓' : sort === 'oldest' ? '↑' : '↕';
   }
 
+  // Free-tier: restrict to the 50-job random sample
+  if (getUserTier() === 'free') {
+    updateFreeSample();
+    if (freeSampleSet) filtered = filtered.filter(j => freeSampleSet.has(j.id));
+  }
+
   currentPage = 1;
   render();
 }
@@ -1123,6 +1195,17 @@ function render() {
 
   document.getElementById('result-count').textContent =
     `${total.toLocaleString()} position${total !== 1 ? 's' : ''}`;
+
+  // Show/hide free-tier upgrade banner
+  const freeBanner = document.getElementById('free-tier-banner');
+  if (freeBanner) {
+    if (getUserTier() === 'free' && allJobs.length > 50) {
+      document.getElementById('free-tier-total').textContent = allJobs.length.toLocaleString();
+      freeBanner.classList.remove('hidden');
+    } else {
+      freeBanner.classList.add('hidden');
+    }
+  }
 
   const container = document.getElementById('results');
   const panel     = document.getElementById('results-panel');
@@ -1870,6 +1953,11 @@ function clearCVMatch() {
 
 // ── CV UI events ────────────────────────────────────────────────────────────────
 document.getElementById('btn-cv-toggle').addEventListener('click', () => {
+  if (getUserTier() !== 'pro') {
+    _selectedTier = 'pro';
+    showSubscribePage();
+    return;
+  }
   if (matchMode) { clearCVMatch(); return; } // CV loaded — clicking removes it
   const panel = document.getElementById('cv-panel');
   panel.classList.toggle('hidden');
@@ -1948,6 +2036,11 @@ let coachReady    = false;
 let coachState    = 'closed'; // 'closed' | 'open' | 'minimized'
 
 function toggleCoach() {
+  if (getUserTier() !== 'pro') {
+    _selectedTier = 'pro';
+    showSubscribePage();
+    return;
+  }
   if (coachState === 'closed' || coachState === 'minimized') openCoach();
   else minimizeCoach();
 }
@@ -2208,27 +2301,64 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
 
 <!-- ── Subscribe modal ────────────────────────────────────────────────────── -->
 <div id="subscribe-overlay" class="hidden" onclick="if(event.target===this)closeSubscribePage()">
-  <div class="modal-card" onclick="event.stopPropagation()" style="max-width:420px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-      <span class="modal-title" style="margin-bottom:0;">💎 USG Jobs Premium</span>
+  <div class="modal-card" onclick="event.stopPropagation()" style="max-width:640px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <span class="modal-title" style="margin-bottom:0;">Choose Your Plan</span>
       <button onclick="closeSubscribePage()" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:1.2rem;padding:2px 6px;">✕</button>
     </div>
-    <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:20px;">Unlock all features for one low monthly price.</p>
+    <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:20px;">Click a plan to select it, then pay below.</p>
 
-    <div style="background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:20px;">
-      <div style="font-size:1.4rem;font-weight:800;color:var(--text-1);">$5 <span style="font-size:0.82rem;font-weight:400;color:var(--text-2);">/ month</span></div>
-      <ul style="margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;">
-        <li style="font-size:0.8rem;color:var(--text-1);">✅ Daily email job alerts</li>
-        <li style="font-size:0.8rem;color:var(--text-1);">✅ Save unlimited jobs</li>
-        <li style="font-size:0.8rem;color:var(--text-1);">✅ Advanced salary &amp; location filters</li>
-        <li style="font-size:0.8rem;color:var(--text-1);">✅ Priority support</li>
-      </ul>
+    <!-- Tier cards -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;" id="tier-cards">
+
+      <!-- T1: Free -->
+      <div class="tier-card" id="tier-card-free" onclick="selectTier('free')">
+        <div style="font-size:0.88rem;font-weight:700;color:var(--text-2);">Free</div>
+        <div class="tier-price">$0</div>
+        <div class="tier-feature">✅ 50 job listings</div>
+        <div class="tier-feature">✅ All search &amp; filters</div>
+        <div class="tier-feature muted">— Email alerts</div>
+        <div class="tier-feature muted">— Save jobs</div>
+        <div class="tier-feature muted">— CV matching</div>
+        <div class="tier-feature muted">— AI career coach</div>
+      </div>
+
+      <!-- T2: Basic -->
+      <div class="tier-card tier-selected" id="tier-card-basic" onclick="selectTier('basic')">
+        <div style="font-size:0.88rem;font-weight:700;color:var(--accent);">Basic</div>
+        <div class="tier-price">$5<span> / month</span></div>
+        <div class="tier-feature">✅ All job listings</div>
+        <div class="tier-feature">✅ All search &amp; filters</div>
+        <div class="tier-feature">✅ Daily email alerts</div>
+        <div class="tier-feature">✅ Save unlimited jobs</div>
+        <div class="tier-feature muted">— CV matching</div>
+        <div class="tier-feature muted">— AI career coach</div>
+      </div>
+
+      <!-- T3: Pro -->
+      <div class="tier-card tier-popular" id="tier-card-pro" onclick="selectTier('pro')">
+        <div style="font-size:0.88rem;font-weight:700;color:#7c3aed;">Pro ✨</div>
+        <div class="tier-price" style="color:#7c3aed;">$10<span> / month</span></div>
+        <div class="tier-feature">✅ Everything in Basic</div>
+        <div class="tier-feature">✅ All job listings</div>
+        <div class="tier-feature">✅ Daily email alerts</div>
+        <div class="tier-feature">✅ CV upload &amp; matching</div>
+        <div class="tier-feature">✅ AI career coach</div>
+      </div>
     </div>
 
-    <button class="auth-btn-primary" onclick="startStripeCheckout()" style="margin-bottom:10px;">
-      💳 Pay with Card / Apple Pay / Google Pay
-    </button>
-    <div id="paypal-button-container" style="margin-top:4px;min-height:45px;"></div>
+    <!-- Payment section (hidden when free tier selected) -->
+    <div id="sub-payment-section">
+      <button class="auth-btn-primary" id="sub-stripe-btn" onclick="startStripeCheckout()" style="margin-bottom:10px;">
+        💳 Pay with Card / Apple Pay / Google Pay
+      </button>
+      <div id="paypal-button-container" style="margin-top:4px;min-height:45px;"></div>
+    </div>
+    <!-- Current plan note for free -->
+    <div id="sub-free-note" class="hidden" style="text-align:center;padding:14px 0;font-size:0.82rem;color:var(--text-2);">
+      You're on the free plan. Select Basic or Pro above to upgrade.
+    </div>
+
     <div class="auth-msg" id="sub-msg" style="margin-top:8px;"></div>
   </div>
 </div>
@@ -2289,6 +2419,9 @@ _sb.auth.onAuthStateChange(async (event, session) => {
     savedJobIds.clear();
     userProfile = null;
     refreshSaveButtons();
+    freeSampleSet = null;  // reset sample so a new one is drawn for anonymous visitors
+    updateFreeSample();
+    if (allJobs.length > 0) applyFilters();
   }
 });
 
@@ -2305,9 +2438,10 @@ function updateHeaderUI() {
     const initial = (name || currentUser.email || '?')[0].toUpperCase();
     avatar.textContent = initial;
     label.textContent  = name ? name.split(' ')[0] : currentUser.email.split('@')[0];
-    // Show upgrade button for non-premium users — default to visible, hide only if confirmed premium
+    // Show upgrade button for free + basic users; hide only for Pro
     const subBtn = document.getElementById('umenu-subscribe');
-    if (subBtn) subBtn.style.display = (userProfile?.subscription_status === 'active') ? 'none' : '';
+    const isPro = userProfile?.subscription_status === 'active' && userProfile?.subscription_tier === 'pro';
+    if (subBtn) subBtn.style.display = isPro ? 'none' : '';
   } else {
     btnSignin.classList.remove('hidden'); btnSignin.style.display = '';
     btnUser.classList.add('hidden');      btnUser.style.display   = 'none';
@@ -2513,18 +2647,25 @@ async function loadProfile() {
   if (!currentUser) return;
   const { data } = await _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
   userProfile = data;
-  // Show "Upgrade" in menu only for free users
+  // Show "Upgrade" for free users; basic users can upgrade to Pro; only Pro stays hidden
   const subBtn = document.getElementById('umenu-subscribe');
-  if (subBtn) subBtn.style.display = (data?.subscription_status !== 'active') ? '' : 'none';
+  const isPro = data?.subscription_status === 'active' && data?.subscription_tier === 'pro';
+  if (subBtn) subBtn.style.display = isPro ? 'none' : '';
   // Update plan badge in profile modal if open
-  updatePlanBadge(data?.subscription_status);
+  updatePlanBadge(data?.subscription_status, data?.subscription_tier);
+  // Re-evaluate free sample now that profile is known
+  updateFreeSample();
 }
 
-function updatePlanBadge(status) {
+function updatePlanBadge(status, tier) {
   const badge = document.getElementById('profile-plan-badge');
   if (!badge) return;
   if (status === 'active') {
-    badge.textContent = 'Premium'; badge.className = 'badge-premium';
+    if (tier === 'pro') {
+      badge.textContent = 'Pro ✨'; badge.className = 'badge-pro';
+    } else {
+      badge.textContent = 'Basic'; badge.className = 'badge-basic';
+    }
   } else {
     badge.textContent = 'Free'; badge.className = 'badge-free';
   }
@@ -2542,7 +2683,7 @@ async function showProfileSettings() {
   document.getElementById('pf-location').value = d.location   || '';
   document.getElementById('pf-jobtitle').value = d.job_title  || '';
   document.getElementById('pf-msg').textContent = '';
-  updatePlanBadge(d.subscription_status);
+  updatePlanBadge(d.subscription_status, d.subscription_tier);
   document.getElementById('profile-overlay').classList.remove('hidden');
 }
 
@@ -2580,70 +2721,113 @@ async function saveProfile() {
 }
 
 // ── Subscribe / Payments ───────────────────────────────────────────────────────
-const STRIPE_PUBLISHABLE_KEY = 'pk_live_51TI5unJkd2cZYOPUjfN11KS61B1KvgG2JQcrRcVlbPHeDl2UcENpRii7pn659XNHEU5JPzbcR3jNArGpicBbChgY00DZFUpAtx';
-const STRIPE_PRICE_ID        = 'price_1TIDP7Jkd2cZYOPUeJ0c2lVG';
-const PAYPAL_CLIENT_ID       = 'AaBm-2zAceQIMBAM_ne9jwOc6FDE91AD2PtUG9nbmuzHHR2OoMHtWjtxqEU5Kj20qPpKvWGzb9NnDo5Z';
+const STRIPE_PUBLISHABLE_KEY     = 'pk_live_51TI5unJkd2cZYOPUjfN11KS61B1KvgG2JQcrRcVlbPHeDl2UcENpRii7pn659XNHEU5JPzbcR3jNArGpicBbChgY00DZFUpAtx';
+const STRIPE_PAYMENT_LINK_BASIC  = 'https://buy.stripe.com/14A8wQe1AgKD3o1dnVds400';
+const STRIPE_PAYMENT_LINK_PRO    = 'https://buy.stripe.com/28EaEY9Lk8e72jX97Fds401';
+const PAYPAL_CLIENT_ID           = 'AaBm-2zAceQIMBAM_ne9jwOc6FDE91AD2PtUG9nbmuzHHR2OoMHtWjtxqEU5Kj20qPpKvWGzb9NnDo5Z';
+const PAYPAL_PLAN_ID_BASIC       = 'P-5P50424889408532HNHICMAI';
+const PAYPAL_PLAN_ID_PRO         = 'P-43V74861SG9034713NHIYS7Y';
+
+let _selectedTier = 'basic'; // 'free' | 'basic' | 'pro'
+
+function getUserTier() {
+  if (!currentUser) return 'free';
+  if (userProfile?.subscription_status === 'active') {
+    return userProfile?.subscription_tier || 'basic';
+  }
+  return 'free';
+}
+
+function selectTier(tier) {
+  _selectedTier = tier;
+  document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('tier-selected'));
+  const card = document.getElementById('tier-card-' + tier);
+  if (card) card.classList.add('tier-selected');
+  const paySection  = document.getElementById('sub-payment-section');
+  const freeNote    = document.getElementById('sub-free-note');
+  if (tier === 'free') {
+    paySection.classList.add('hidden');
+    freeNote.classList.remove('hidden');
+  } else {
+    paySection.classList.remove('hidden');
+    freeNote.classList.add('hidden');
+    reRenderPayPalButton();
+  }
+}
 
 function showSubscribePage() {
   document.getElementById('user-menu-panel').classList.add('hidden');
   if (!currentUser) { openAuthModal('signin'); return; }
   document.getElementById('sub-msg').textContent = '';
+  // Pre-select the next logical tier
+  const current = getUserTier();
+  const preselect = current === 'free' ? 'basic' : current === 'basic' ? 'pro' : 'pro';
+  _selectedTier = preselect;
   document.getElementById('subscribe-overlay').classList.remove('hidden');
-  loadPayPalSDK();   // load & render PayPal button the first time
+  // Highlight correct card
+  document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('tier-selected'));
+  document.getElementById('tier-card-' + preselect)?.classList.add('tier-selected');
+  document.getElementById('sub-payment-section').classList.remove('hidden');
+  document.getElementById('sub-free-note').classList.add('hidden');
+  loadPayPalSDK();
 }
+
 function closeSubscribePage() {
   document.getElementById('subscribe-overlay').classList.add('hidden');
 }
 
 function startStripeCheckout() {
   if (!currentUser) { openAuthModal('signin'); return; }
-  const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/14A8wQe1AgKD3o1dnVds400';
-  window.location.assign(STRIPE_PAYMENT_LINK);
+  const link = _selectedTier === 'pro' ? STRIPE_PAYMENT_LINK_PRO : STRIPE_PAYMENT_LINK_BASIC;
+  if (link.startsWith('YOUR_')) {
+    document.getElementById('sub-msg').textContent = 'Pro Stripe link not configured yet — contact support.';
+    document.getElementById('sub-msg').className = 'auth-msg err';
+    return;
+  }
+  window.location.assign(link);
 }
 
 // ── PayPal SDK loader ─────────────────────────────────────────────────────────
-// PAYPAL_PLAN_ID: create a Subscription Plan in PayPal Dashboard → Catalog → Plans
-// then paste the plan ID (starts with P-) here.
-const PAYPAL_PLAN_ID = 'P-5P50424889408532HNHICMAI';
-
 let _paypalLoaded = false;
+
 function loadPayPalSDK() {
-  if (_paypalLoaded || document.getElementById('paypal-sdk')) return;
-  _paypalLoaded = true;
+  if (document.getElementById('paypal-sdk')) { reRenderPayPalButton(); return; }
+  _paypalLoaded = false;
   const s = document.createElement('script');
   s.id  = 'paypal-sdk';
   s.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription`;
   s.setAttribute('data-sdk-integration-source', 'button-factory');
-  s.onload = renderPayPalButton;
+  s.onload = () => { _paypalLoaded = true; reRenderPayPalButton(); };
   document.head.appendChild(s);
 }
 
-function renderPayPalButton() {
+function reRenderPayPalButton() {
   const container = document.getElementById('paypal-button-container');
   if (!container || !window.paypal) return;
+  const planId = _selectedTier === 'pro' ? PAYPAL_PLAN_ID_PRO : PAYPAL_PLAN_ID_BASIC;
   container.innerHTML = '';
+  if (planId.startsWith('YOUR_')) {
+    container.innerHTML = `<p style="font-size:0.75rem;color:var(--text-3);text-align:center;padding:8px 0;">PayPal for Pro not configured yet.</p>`;
+    return;
+  }
   window.paypal.Buttons({
     style: { shape: 'rect', color: 'gold', layout: 'horizontal', label: 'subscribe' },
-    createSubscription: (data, actions) => {
-      if (PAYPAL_PLAN_ID === 'YOUR_PAYPAL_PLAN_ID') {
-        document.getElementById('sub-msg').textContent = 'PayPal plan not configured yet.';
-        document.getElementById('sub-msg').className = 'auth-msg err';
-        return Promise.reject(new Error('No plan ID'));
-      }
-      return actions.subscription.create({ plan_id: PAYPAL_PLAN_ID });
-    },
+    createSubscription: (_data, actions) => actions.subscription.create({ plan_id: planId }),
     onApprove: async (data) => {
-      // Mark user as subscribed in Supabase
       if (currentUser) {
         await _sb.from('profiles').update({
           subscription_status: 'active',
+          subscription_tier: _selectedTier,
           paypal_sub_id: data.subscriptionID,
           updated_at: new Date().toISOString(),
         }).eq('id', currentUser.id);
         await loadProfile();
+        updateFreeSample();
+        applyFilters();
       }
       closeSubscribePage();
-      alert('🎉 Welcome to Premium! Your PayPal subscription is now active.');
+      const label = _selectedTier === 'pro' ? 'Pro' : 'Basic';
+      alert(`🎉 Welcome to ${label}! Your subscription is now active.`);
     },
     onError: (err) => {
       document.getElementById('sub-msg').textContent = 'PayPal error: ' + err;
@@ -2652,19 +2836,26 @@ function renderPayPalButton() {
   }).render('#paypal-button-container');
 }
 
-// Handle return from payment gateway
+// Handle return from Stripe payment link
 (function checkPaymentReturn() {
   const params = new URLSearchParams(window.location.search);
+  const tierParam = params.get('tier') || 'basic'; // ?tier=pro or ?tier=basic
   if (params.get('payment') === 'success') {
     setTimeout(async () => {
-      await loadProfile();
-      const status = userProfile?.subscription_status;
-      if (status === 'active') {
-        alert('🎉 Welcome to Premium! Your subscription is now active.');
-      } else {
-        alert('Payment received! Your account will be upgraded shortly.');
+      // For Stripe we don't have webhook yet — optimistically mark active
+      if (currentUser) {
+        await _sb.from('profiles').upsert({
+          id: currentUser.id,
+          subscription_status: 'active',
+          subscription_tier: tierParam,
+          updated_at: new Date().toISOString(),
+        });
       }
-      // Clean URL
+      await loadProfile();
+      updateFreeSample();
+      applyFilters();
+      const label = tierParam === 'pro' ? 'Pro ✨' : 'Basic';
+      alert(`🎉 Welcome to ${label}! Your subscription is now active.`);
       window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     }, 1500);
   } else if (params.get('payment') === 'cancelled') {
