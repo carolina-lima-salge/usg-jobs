@@ -1955,11 +1955,9 @@ function clearCVMatch() {
 
 // ── CV UI events ────────────────────────────────────────────────────────────────
 document.getElementById('btn-cv-toggle').addEventListener('click', () => {
-  if (getUserTier() !== 'pro') {
-    _selectedTier = 'pro';
-    showSubscribePage();
-    return;
-  }
+  const tier = getUserTier();
+  if (tier === 'pending') return; // profile still loading — ignore click
+  if (tier !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
   if (matchMode) { clearCVMatch(); return; } // CV loaded — clicking removes it
   const panel = document.getElementById('cv-panel');
   panel.classList.toggle('hidden');
@@ -2038,11 +2036,9 @@ let coachReady    = false;
 let coachState    = 'closed'; // 'closed' | 'open' | 'minimized'
 
 function toggleCoach() {
-  if (getUserTier() !== 'pro') {
-    _selectedTier = 'pro';
-    showSubscribePage();
-    return;
-  }
+  const tier = getUserTier();
+  if (tier === 'pending') return; // profile still loading — ignore click
+  if (tier !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
   if (coachState === 'closed' || coachState === 'minimized') openCoach();
   else minimizeCoach();
 }
