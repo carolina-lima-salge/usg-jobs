@@ -521,21 +521,39 @@ def fetch_detail_requests(session: requests.Session, job_id: str) -> str | None:
 
 def fetch_detail_playwright(page, job_id: str) -> str | None:
     url = DETAIL_URL_TEMPLATE.format(job_id=job_id)
-    try:
-        page.goto(url, wait_until="load", timeout=60_000)
+
+    def _try_fetch() -> str | None:
         try:
-            page.wait_for_selector(
-                "#HRS_SCH_WRK2_POSTING_TITLE, #HRS_SCH_PSTDSC_DESCRLONG\\$0",
-                timeout=20_000
-            )
-        except Exception:
-            page.wait_for_timeout(2000)
-        html = page.content()
-        if "HRS_SCH_WRK2_POSTING_TITLE" in html or "HRS_SCH_PSTDSC_DESCRLONG" in html:
-            return html
+            page.goto(url, wait_until="load", timeout=60_000)
+            try:
+                page.wait_for_selector(
+                    "#HRS_SCH_WRK2_POSTING_TITLE, #HRS_SCH_PSTDSC_DESCRLONG\\$0",
+                    timeout=20_000,
+                )
+            except Exception:
+                page.wait_for_timeout(3000)
+            html = page.content()
+            if "HRS_SCH_WRK2_POSTING_TITLE" in html or "HRS_SCH_PSTDSC_DESCRLONG" in html:
+                return html
+        except Exception as e:
+            if DEBUG: print(f"    playwright fetch error {job_id}: {e}")
+        return None
+
+    # First attempt
+    html = _try_fetch()
+    if html:
+        return html
+
+    # Session may have expired — navigate back to ENTRY_URL to refresh it, then retry
+    if DEBUG: print(f"    {job_id}: refreshing session and retrying …")
+    try:
+        page.goto(ENTRY_URL, wait_until="load", timeout=60_000)
+        page.wait_for_timeout(3000)
     except Exception as e:
-        if DEBUG: print(f"    playwright failed {job_id}: {e}")
-    return None
+        if DEBUG: print(f"    session refresh failed: {e}")
+        return None
+
+    return _try_fetch()
 
 
 def _load_already_fetched(csv_path: str) -> set[str]:
