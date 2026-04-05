@@ -1000,6 +1000,63 @@ def scrape_taleo(page, urls: list[tuple[str,str]]) -> list[dict]:
 
 # ─── Portals 3 & 4: Faculty Careers (Interfolio / HigherEdJobs-style) ────────
 
+# Known GSU college / unit names that are NOT job titles.
+# These appear as navigation link text in the server-rendered HTML when the
+# Interfolio portal requires JavaScript and the requests scraper only gets the
+# skeleton page.  If a card title matches one of these, the scrape is broken.
+_GSU_UNIT_NAMES = {
+    "perimeter college",
+    "robinson college of business",
+    "andrew young school of policy studies",
+    "college of arts & sciences",
+    "college of arts and sciences",
+    "college of education & human development",
+    "college of law",
+    "graduate studies",
+    "honors college",
+    "institute for biomedical sciences",
+    "nek college of public health",
+    "school of public health",
+    "georgia state university",
+    "georgia state",
+    "gsu",
+}
+
+
+def _faculty_cards_look_valid(cards: list[dict]) -> bool:
+    """
+    Return True if the list of cards looks like real job listings.
+
+    Signs that the scraper received broken (JS-gated) HTML:
+      • No cards at all.
+      • More than half the cards share the same title.
+      • Any card title matches a known GSU college / unit name.
+      • All card titles are very short (≤ 3 words) — navigation snippet.
+    """
+    if not cards:
+        return False
+
+    # Check for known unit names
+    for card in cards:
+        if card.get("title", "").strip().lower() in _GSU_UNIT_NAMES:
+            return False
+
+    # Check for low title diversity (>50% identical)
+    from collections import Counter
+    title_counts = Counter(card.get("title", "") for card in cards)
+    most_common_count = title_counts.most_common(1)[0][1]
+    if most_common_count > len(cards) * 0.5:
+        return False
+
+    # Check for suspiciously short titles (navigation remnants)
+    short_titles = sum(
+        1 for card in cards if len(card.get("title", "").split()) <= 2
+    )
+    if short_titles > len(cards) * 0.5:
+        return False
+
+    return True
+
 def _faculty_parse_listing_page(html: str, label: str, seen: set) -> list[dict]:
     """
     Parse one page of Interfolio faculty postings.
@@ -1306,19 +1363,34 @@ def _faculty_fetch_detail(page, card: dict, use_playwright: bool = False) -> dic
     url = card["url"]
     html = None
 
+    def _html_is_garbled(h: str) -> bool:
+        """Return True if the HTML looks like a JS-gated shell (no real content)."""
+        text_start = BeautifulSoup(h, "lxml").get_text()[:200].lower().strip()
+        return text_start.startswith("toggle navigation") or (
+            "toggle navigation" in text_start[:100]
+        )
+
     if not use_playwright:
         try:
             r = requests.get(url, headers=HEADERS, timeout=30)
             if r.status_code == 200 and len(r.text) > 5_000:
-                html = r.text
+                if _html_is_garbled(r.text):
+                    if DEBUG:
+                        print(f"    requests HTML is garbled (JS-gated) — trying Playwright")
+                else:
+                    html = r.text
         except Exception as e:
             if DEBUG: print(f"    requests failed {url}: {e}")
 
     if html is None and page is not None:
         try:
-            page.goto(url, wait_until="load", timeout=45_000)
+            page.goto(url, wait_until="networkidle", timeout=45_000)
             page.wait_for_timeout(2000)
             html = page.content()
+            if _html_is_garbled(html):
+                if DEBUG:
+                    print(f"    Playwright HTML also garbled — skipping {url}")
+                html = None
         except Exception as e:
             if DEBUG: print(f"    playwright failed {url}: {e}")
 
@@ -1358,9 +1430,25 @@ def scrape_faculty(page, portal_urls: list[tuple[str,str]]) -> list[dict]:
         # Try requests first
         cards = _faculty_collect_links_requests(search_url, label)
 
-        # If requests found nothing, try Playwright
-        if not cards and page is not None:
-            cards = _faculty_collect_links_playwright(page, search_url, label)
+        # If requests found nothing OR returned suspicious/broken data (e.g. JS-gated
+        # page returned navigation text as titles), fall back to Playwright.
+        if not _faculty_cards_look_valid(cards):
+            if not cards:
+                print(f"  Requests returned no cards — trying Playwright …", flush=True)
+            else:
+                print(
+                    f"  Requests returned {len(cards)} cards but they look invalid "
+                    f"(likely JS-gated page). Discarding and trying Playwright …",
+                    flush=True,
+                )
+                cards = []  # discard the bad cards
+            if page is not None:
+                cards = _faculty_collect_links_playwright(page, search_url, label)
+            else:
+                print(
+                    "  WARNING: Playwright not available — faculty scrape may be incomplete.",
+                    flush=True,
+                )
 
         for c in cards:
             if c["job_id"] not in seen_ids:
