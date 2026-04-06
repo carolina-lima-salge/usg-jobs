@@ -79,10 +79,12 @@ jobs:
       - name: Install embedding dependencies
         if: env.DEPLOY == 'true'
         run: pip install fastembed numpy
+        continue-on-error: true   # don't block deploy if fastembed install fails
 
       - name: Generate job embeddings
         if: env.DEPLOY == 'true'
         run: python generate_embeddings.py
+        continue-on-error: true   # don't block deploy if embeddings fail
 
       - name: Commit and push all updates
         if: env.DEPLOY == 'true'
