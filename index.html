@@ -549,9 +549,11 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
         <input id="search" type="search" placeholder="Search titles, departments…"
+               list="search-suggestions" autocomplete="off"
                style="border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px 5px 28px;font-size:0.8rem;width:100%;height:30px;outline:none;font-family:inherit;color:var(--text-1);background:var(--surface);"
                onfocus="this.style.outlineColor='var(--accent)';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='-1px'"
                onblur="this.style.outline='none'" />
+        <datalist id="search-suggestions"></datalist>
       </div>
 
       <!-- Institution multi-select -->
@@ -608,12 +610,6 @@
       <select id="f-sort" class="filter-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
-        <option value="salary-desc">Highest salary</option>
-        <option value="salary-asc">Lowest salary</option>
-        <option value="blend-desc">Recent &amp; high pay</option>
-        <option value="blend-asc">Recent &amp; low pay</option>
-        <option value="blend-old-desc">Older &amp; high pay</option>
-        <option value="blend-old-asc">Older &amp; low pay</option>
       </select>
 
       <!-- Min salary filter -->
@@ -625,17 +621,6 @@
         <option value="100000">$100K+</option>
       </select>
 
-      <!-- Has salary checkbox -->
-      <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-2);cursor:pointer;user-select:none;white-space:nowrap;">
-        <input id="f-salary" type="checkbox" style="accent-color:var(--accent);" />
-        Has salary
-      </label>
-
-      <!-- Remote checkbox -->
-      <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-2);cursor:pointer;user-select:none;white-space:nowrap;">
-        <input id="f-remote" type="checkbox" style="accent-color:var(--accent);" />
-        Remote
-      </label>
 
       <!-- CV Match button -->
       <button id="btn-cv-toggle" type="button"
@@ -977,6 +962,7 @@ async function loadData() {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('results').classList.remove('hidden');
 
+    buildSearchSuggestions();
     applyFilters();
   } catch(e) {
     document.getElementById('loading').innerHTML =
@@ -1077,6 +1063,19 @@ function onSearchInput() {
   searchTimer = setTimeout(() => { currentPage = 1; applyFilters(); saveStateToHash(); }, 220);
 }
 
+function buildSearchSuggestions() {
+  const dl = document.getElementById('search-suggestions');
+  if (!dl || !allJobs.length) return;
+  // Collect unique titles and departments, capped at 200 suggestions
+  const seen = new Set();
+  const items = [];
+  for (const job of allJobs) {
+    if (job.title && !seen.has(job.title)) { seen.add(job.title); items.push(job.title); }
+    if (items.length >= 200) break;
+  }
+  dl.innerHTML = items.map(t => `<option value="${t.replace(/"/g,'&quot;')}"></option>`).join('');
+}
+
 function resetAllFilters() {
   // Clear text search
   const searchEl = document.getElementById('search');
@@ -1086,9 +1085,6 @@ function resetAllFilters() {
   if (typeEl) typeEl.value = '';
   const sortEl = document.getElementById('f-sort');
   if (sortEl) sortEl.value = 'newest';
-  // Clear remote checkbox
-  const remoteEl = document.getElementById('f-remote');
-  if (remoteEl) remoteEl.checked = false;
   // Clear multi-selects
   selectedInsts.clear();
   selectedLocs.clear();
@@ -1113,12 +1109,10 @@ function applyFilters() {
   const posted      = parseInt(document.getElementById('f-posted').value) || 0;
   const sort        = document.getElementById('f-sort').value;
   const minSalary   = parseInt(document.getElementById('f-min-salary').value) || 0;
-  const salOnly     = document.getElementById('f-salary').checked;
-  const remoteOnly = document.getElementById('f-remote').checked;
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || salOnly || remoteOnly || sort !== 'newest';
+  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || sort !== 'newest';
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
@@ -1141,14 +1135,10 @@ function applyFilters() {
       if (!d || d < cutoff) return false;
     }
 
-    if (salOnly && !job.salary) return false;
-
     if (minSalary > 0) {
       const n = parseSalaryNum(job);
       if (n < minSalary) return false;
     }
-
-    if (remoteOnly && !job.remote) return false;
 
     if (q) {
       const haystack = `${job.title} ${job.institution} ${job.department} ${job.location} ${job.summary}`.toLowerCase();
@@ -1161,45 +1151,6 @@ function applyFilters() {
   // Sort — CV match overrides all other sorts when active
   if (matchMode) {
     filtered.sort((a, b) => (cvScores[b.id] || 0) - (cvScores[a.id] || 0));
-  } else if (sort === 'blend-desc' || sort === 'blend-asc' || sort === 'blend-old-desc' || sort === 'blend-old-asc') {
-    // Blended sort: salary rank + recency rank combined (60/40 weight)
-    // Each job gets a 0-1 score on both dimensions; they're averaged together.
-    const salNums = filtered.map(j => parseSalaryNum(j));
-    const dates   = filtered.map(j => dateOf(j));
-
-    const salMax = Math.max(...salNums.filter(n => n > 0), 1);
-    const salMin = Math.min(...salNums.filter(n => n > 0), 0);
-    const dateMax = Math.max(...dates, 1);
-    const dateMin = Math.min(...dates.filter(d => d > 0), 0);
-    const dateRange = dateMax - dateMin || 1;
-    const salRange  = salMax  - salMin  || 1;
-
-    const scoreMap = new Map();
-    filtered.forEach((job, i) => {
-      const sal  = salNums[i];
-      const dt   = dates[i];
-      const salScore  = sal  > 0 ? (sal  - salMin) / salRange  : 0;
-      const dateScore = dt   > 0 ? (dt   - dateMin) / dateRange : 0;
-      const directedSal  = (sort === 'blend-desc' || sort === 'blend-old-desc') ? salScore : (1 - salScore);
-      const directedDate = (sort === 'blend-desc' || sort === 'blend-asc')      ? dateScore : (1 - dateScore);
-      scoreMap.set(job.id, directedSal * 0.6 + directedDate * 0.4);
-    });
-
-    filtered.sort((a, b) => (scoreMap.get(b.id) || 0) - (scoreMap.get(a.id) || 0));
-  } else if (sort === 'salary-desc') {
-    filtered.sort((a, b) => {
-      const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-      if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);
-      if (na === -1) return 1; if (nb === -1) return -1;
-      return nb !== na ? nb - na : dateOf(b) - dateOf(a);
-    });
-  } else if (sort === 'salary-asc') {
-    filtered.sort((a, b) => {
-      const na = parseSalaryNum(a), nb = parseSalaryNum(b);
-      if (na === -1 && nb === -1) return dateOf(b) - dateOf(a);
-      if (na === -1) return 1; if (nb === -1) return -1;
-      return na !== nb ? na - nb : dateOf(b) - dateOf(a);
-    });
   } else if (sort === 'oldest') {
     filtered.sort((a, b) => dateOf(a) - dateOf(b));
   } else {
@@ -1532,8 +1483,6 @@ function saveStateToHash() {
     const def = id === 'f-sort' ? 'newest' : '';
     if (v && v !== def) params.set(id.replace('f-',''), v);
   });
-  if (document.getElementById('f-salary').checked)  params.set('hasSalary', '1');
-  if (document.getElementById('f-remote').checked)  params.set('remote', '1');
   if (selectedInsts.size) params.set('inst', [...selectedInsts].join('|'));
   if (selectedLocs.size)  params.set('loc',  [...selectedLocs].join('|'));
   const str = params.toString();
@@ -1549,8 +1498,6 @@ function loadStateFromHash() {
     const key = id.replace('f-','');
     if (params.has(key)) document.getElementById(id).value = params.get(key);
   });
-  if (params.get('hasSalary') === '1') document.getElementById('f-salary').checked = true;
-  if (params.get('remote')    === '1') document.getElementById('f-remote').checked = true;
   // Multi-selects are populated after data loads — store pending values for later
   if (params.has('inst')) window._pendingInsts = params.get('inst').split('|');
   if (params.has('loc'))  window._pendingLocs  = params.get('loc').split('|');
@@ -2479,6 +2426,15 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Wrap any Supabase query promise with a timeout so a hanging network call
+// never blocks the UI. Resolves with {data: fallback, error: null} on timeout.
+function sbQuery(promise, timeoutMs = 8000, fallback = null) {
+  const timer = new Promise(resolve =>
+    setTimeout(() => resolve({ data: fallback, error: null }), timeoutMs)
+  );
+  return Promise.race([promise, timer]);
+}
+
 let currentUser  = null;
 let savedJobIds  = new Set();   // job IDs the current user has saved
 
@@ -2620,7 +2576,7 @@ function showMsg(el, text, type) {
 // ── Saved jobs (DB) ───────────────────────────────────────────────────────────
 async function loadSavedJobIds() {
   if (!currentUser) return;
-  const { data } = await _sb.from('saved_jobs').select('job_id').eq('user_id', currentUser.id);
+  const { data } = await sbQuery(_sb.from('saved_jobs').select('job_id').eq('user_id', currentUser.id), 8000, []);
   savedJobIds = new Set((data || []).map(r => r.job_id));
 }
 
@@ -2676,7 +2632,7 @@ async function toggleSaveJob(jobId, event) {
     // Unsave
     savedJobIds.delete(jobId);
     btn.classList.remove('saved'); btn.title = 'Save job';
-    const { error } = await _sb.from('saved_jobs').delete().eq('user_id', currentUser.id).eq('job_id', jobId);
+    const { error } = await sbQuery(_sb.from('saved_jobs').delete().eq('user_id', currentUser.id).eq('job_id', jobId));
     if (error) {
       // Revert
       savedJobIds.add(jobId); btn.classList.add('saved'); btn.title = 'Remove from saved';
@@ -2687,12 +2643,12 @@ async function toggleSaveJob(jobId, event) {
     savedJobIds.add(jobId);
     btn.classList.add('saved'); btn.title = 'Remove from saved';
     const job = allJobs.find(j => j.id === jobId) || {};
-    const { error } = await _sb.from('saved_jobs').upsert({
+    const { error } = await sbQuery(_sb.from('saved_jobs').upsert({
       user_id: currentUser.id, job_id: jobId,
       job_title: job.title, institution: job.institution,
       location: job.location, salary: job.salary,
       posted: job.posted, view_url: job.view,
-    });
+    }));
     if (error) {
       // Revert
       savedJobIds.delete(jobId); btn.classList.remove('saved'); btn.title = 'Save job';
@@ -2726,8 +2682,10 @@ async function showSavedJobs() {
   const container = document.getElementById('saved-results');
   container.innerHTML = '<p style="color:var(--text-3);font-size:0.85rem;padding:40px 0;text-align:center;">Loading…</p>';
 
-  const { data, error } = await _sb.from('saved_jobs')
-    .select('*').eq('user_id', currentUser.id).order('saved_at', { ascending: false });
+  const { data, error } = await sbQuery(
+    _sb.from('saved_jobs').select('*').eq('user_id', currentUser.id).order('saved_at', { ascending: false }),
+    8000, []
+  );
 
   if (error || !data?.length) {
     container.innerHTML = '<p style="color:var(--text-3);font-size:0.85rem;padding:60px 0;text-align:center;">No saved jobs yet.<br><span style="font-size:0.78rem;">Click the ★ on any job to save it.</span></p>';
@@ -2769,9 +2727,10 @@ async function loadProfile() {
   if (!currentUser) return;
   // Race the Supabase fetch against a 10-second timeout so a hanging
   // network call doesn't keep the user in 'pending' tier forever.
-  const fetchPromise = _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
-  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ data: null }), 10000));
-  const { data } = await Promise.race([fetchPromise, timeoutPromise]);
+  const { data } = await sbQuery(
+    _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(),
+    10000, null
+  );
   userProfile = data;
   // Show "Upgrade" for free users; basic users can upgrade to Pro; only Pro stays hidden
   const subBtn = document.getElementById('umenu-subscribe');
@@ -2830,12 +2789,12 @@ async function confirmCancelSubscription() {
   if (!ok) return;
   const msg = document.getElementById('pf-cancel-msg');
   msg.textContent = 'Cancelling…'; msg.className = 'auth-msg';
-  const { error } = await _sb.from('profiles').update({
+  const { error } = await sbQuery(_sb.from('profiles').update({
     subscription_status: null,
     subscription_tier:   null,
     paypal_sub_id:       null,
     updated_at:          new Date().toISOString(),
-  }).eq('id', currentUser.id);
+  }).eq('id', currentUser.id));
   if (error) {
     msg.textContent = 'Error: ' + error.message; msg.className = 'auth-msg err';
   } else {
@@ -2869,7 +2828,7 @@ async function saveProfile() {
     job_title:     document.getElementById('pf-jobtitle').value.trim(),
     updated_at:    new Date().toISOString(),
   };
-  const { error } = await _sb.from('profiles').upsert(payload);
+  const { error } = await sbQuery(_sb.from('profiles').upsert(payload));
   btn.disabled = false; btn.textContent = 'Save profile';
   if (error) {
     msg.textContent = 'Error: ' + error.message; msg.className = 'auth-msg err';
@@ -2983,12 +2942,12 @@ function reRenderPayPalButton() {
     createSubscription: (_data, actions) => actions.subscription.create({ plan_id: planId }),
     onApprove: async (data) => {
       if (currentUser) {
-        await _sb.from('profiles').update({
+        await sbQuery(_sb.from('profiles').update({
           subscription_status: 'active',
           subscription_tier: _selectedTier,
           paypal_sub_id: data.subscriptionID,
           updated_at: new Date().toISOString(),
-        }).eq('id', currentUser.id);
+        }).eq('id', currentUser.id));
         await loadProfile();
         updateFreeSample();
         applyFilters();
@@ -3012,12 +2971,12 @@ function reRenderPayPalButton() {
     setTimeout(async () => {
       // For Stripe we don't have webhook yet — optimistically mark active
       if (currentUser) {
-        await _sb.from('profiles').upsert({
+        await sbQuery(_sb.from('profiles').upsert({
           id: currentUser.id,
           subscription_status: 'active',
           subscription_tier: tierParam,
           updated_at: new Date().toISOString(),
-        });
+        }));
       }
       await loadProfile();
       updateFreeSample();
@@ -3037,7 +2996,10 @@ async function showAlertSettings() {
   if (!currentUser) { openAuthModal('signin'); return; }
 
   // Pre-fill existing prefs
-  const { data } = await _sb.from('alert_preferences').select('*').eq('user_id', currentUser.id).maybeSingle();
+  const { data } = await sbQuery(
+    _sb.from('alert_preferences').select('*').eq('user_id', currentUser.id).maybeSingle(),
+    8000, null
+  );
   if (data) {
     document.getElementById('al-keywords').value  = data.keywords || '';
     document.getElementById('al-minsalary').value = data.min_salary || '';
@@ -3066,7 +3028,7 @@ async function saveAlertPrefs() {
     active:     document.getElementById('al-active').checked,
     updated_at: new Date().toISOString(),
   };
-  const { error } = await _sb.from('alert_preferences').upsert(prefs);
+  const { error } = await sbQuery(_sb.from('alert_preferences').upsert(prefs));
   const msg = document.getElementById('al-msg');
   if (error) showMsg(msg, error.message, 'err');
   else { showMsg(msg, '✓ Preferences saved!', 'ok'); setTimeout(closeAlertSettings, 1000); }
