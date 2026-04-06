@@ -91,7 +91,11 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Stage jobs.json, embeddings, AND all scraper-generated CSV/JSON files
+          # so they are never left as untracked files, which would cause the
+          # rebase below to abort with "untracked file would be overwritten".
           git add jobs.json job_embeddings.bin job_embeddings_meta.json
+          git add scrapers/*.csv scrapers/*.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No changes — skipping commit."
           else
