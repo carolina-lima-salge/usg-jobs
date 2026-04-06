@@ -3204,6 +3204,8 @@ function renderTrackBtn(job) {
 async function trackApplication(jobId, event) {
   event.stopPropagation();
   if (!currentUser) { openAuthModal('signin'); return; }
+  // Capture button reference NOW — event.currentTarget becomes null after any await
+  const btn = event.currentTarget;
   const job  = allJobs.find(j => j.id === jobId) || {};
   const existing = appTracker[jobId];
   if (existing) {
@@ -3226,8 +3228,6 @@ async function trackApplication(jobId, event) {
   const { error } = await sbQuery(_sb.from('job_applications').upsert(row));
   if (error) { alert('Could not track application: ' + error.message); return; }
   appTracker[jobId] = row;
-  // Refresh the button in place
-  const btn = event.currentTarget;
   btn.textContent = '📋 Applied';
   btn.className = 'track-btn tracked';
   _showShareToast('✅ Added to Applied in My Applications');
