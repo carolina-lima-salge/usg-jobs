@@ -108,3 +108,14 @@ jobs:
             git rebase -X ours origin/main
             git push
           fi
+
+      - name: Send priority alerts to Pro subscribers
+        if: env.DEPLOY == 'true'
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL:           ${{ secrets.FROM_EMAIL }}
+          SITE_URL:             ${{ secrets.SITE_URL }}
+        run: python3 scrapers/priority_alerts.py
+        continue-on-error: true   # never block the workflow if alerts fail

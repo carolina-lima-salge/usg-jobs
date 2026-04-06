@@ -495,6 +495,81 @@
       #coach-btn   { right: 14px; bottom: 14px; padding: 9px 14px; font-size: 0.8rem; }
       #coach-nudge { right: 14px; bottom: 63px; max-width: 180px; }
     }
+    /* ── Application Tracker ─────────────────────────────────────── */
+    #tracker-panel { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .kanban-board {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    @media (max-width: 800px) { .kanban-board { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 480px) { .kanban-board { grid-template-columns: 1fr; } }
+    .kanban-col {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      min-height: 200px;
+    }
+    .kanban-col-header {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--text-2);
+      margin-bottom: 10px; padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+    .kanban-col-header .k-count {
+      background: var(--border); border-radius: 20px;
+      padding: 1px 7px; font-size: 0.68rem; color: var(--text-2);
+    }
+    .kanban-col[data-status="applied"]     .kanban-col-header { border-color: #3b82f6; color: #3b82f6; }
+    .kanban-col[data-status="interviewing"] .kanban-col-header { border-color: #f59e0b; color: #b45309; }
+    .kanban-col[data-status="offered"]     .kanban-col-header { border-color: #10b981; color: #065f46; }
+    .kanban-col[data-status="rejected"]    .kanban-col-header { border-color: #ef4444; color: #991b1b; }
+    .kanban-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) - 2px);
+      padding: 10px 11px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .kanban-card:hover { border-color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .kanban-card-title { font-size: 0.82rem; font-weight: 600; color: var(--text-1); line-height: 1.35; }
+    .kanban-card-meta  { font-size: 0.72rem; color: var(--text-2); margin-top: 3px; }
+    .kanban-card-actions {
+      display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px;
+    }
+    .kanban-move-btn {
+      font-size: 0.68rem; padding: 2px 8px; border-radius: 4px;
+      border: 1px solid var(--border); background: var(--bg-2);
+      color: var(--text-2); cursor: pointer; font-family: inherit;
+      transition: background .12s, color .12s;
+    }
+    .kanban-move-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .kanban-move-btn.del { color: #b91c1c; }
+    .kanban-move-btn.del:hover { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+    .kanban-notes {
+      width: 100%; margin-top: 6px; padding: 5px 7px;
+      font-size: 0.75rem; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--bg); color: var(--text-1);
+      font-family: inherit; resize: vertical; min-height: 44px;
+      box-sizing: border-box;
+    }
+    .kanban-notes:focus { outline: none; border-color: var(--accent); }
+    .track-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 14px; border-radius: var(--radius);
+      font-size: 0.78rem; font-weight: 500;
+      color: var(--text-1); background: var(--bg);
+      border: 1px solid var(--border-strong);
+      cursor: pointer; font-family: inherit;
+      text-decoration: none; transition: border-color .15s;
+    }
+    .track-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .track-btn.tracked { color: #3b82f6; border-color: #93c5fd; background: #eff6ff; }
   </style>
 </head>
 
@@ -527,6 +602,7 @@
           </button>
           <div id="user-menu-panel" class="hidden">
             <button class="umenu-item" onclick="showSavedJobs()">⭐ Saved jobs</button>
+            <button class="umenu-item" onclick="showTracker()">📋 My applications</button>
             <button class="umenu-item" onclick="showAlertSettings()">🔔 Email alerts</button>
             <button class="umenu-item" onclick="showProfileSettings()">👤 My profile</button>
             <button class="umenu-item" onclick="showSubscribePage()" id="umenu-subscribe" style="display:none;">💎 Upgrade to Premium</button>
@@ -734,6 +810,33 @@
     </div>
     <div id="saved-results">
       <p style="color:var(--text-3);font-size:0.85rem;padding:40px 0;text-align:center;">Loading saved jobs…</p>
+    </div>
+  </div>
+
+  <!-- ── Application Tracker ────────────────────────────────────────────── -->
+  <div id="tracker-panel" class="hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <h2 style="font-size:0.95rem;font-weight:700;color:var(--text-1);">📋 My Applications</h2>
+      <button onclick="hideTracker()" style="font-size:0.78rem;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;">← Back to all jobs</button>
+    </div>
+    <p style="font-size:0.78rem;color:var(--text-3);margin-bottom:4px;">Track jobs through your application process. Click "Track" on any job to add it here.</p>
+    <div class="kanban-board">
+      <div class="kanban-col" data-status="applied">
+        <div class="kanban-col-header">📤 Applied <span class="k-count" id="kcount-applied">0</span></div>
+        <div id="kcol-applied"></div>
+      </div>
+      <div class="kanban-col" data-status="interviewing">
+        <div class="kanban-col-header">🗣 Interviewing <span class="k-count" id="kcount-interviewing">0</span></div>
+        <div id="kcol-interviewing"></div>
+      </div>
+      <div class="kanban-col" data-status="offered">
+        <div class="kanban-col-header">🎉 Offered <span class="k-count" id="kcount-offered">0</span></div>
+        <div id="kcol-offered"></div>
+      </div>
+      <div class="kanban-col" data-status="rejected">
+        <div class="kanban-col-header">❌ Rejected <span class="k-count" id="kcount-rejected">0</span></div>
+        <div id="kcol-rejected"></div>
+      </div>
     </div>
   </div>
 
@@ -1376,7 +1479,7 @@ function renderCard(job) {
     <div class="row-detail">
       ${detailMeta ? `<div style="font-size:0.73rem;color:var(--text-2);margin-bottom:10px;display:flex;flex-wrap:wrap;align-items:center;">${detailMeta}</div>` : ''}
       ${summary}
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">${actionButtons}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">${actionButtons}${renderTrackBtn(job)}</div>
       ${renderSimilarJobs(job)}
     </div>
   </div>
@@ -3069,6 +3172,162 @@ async function saveAlertPrefs() {
   const msg = document.getElementById('al-msg');
   if (error) showMsg(msg, error.message, 'err');
   else { showMsg(msg, '✓ Preferences saved!', 'ok'); setTimeout(closeAlertSettings, 1000); }
+}
+
+// ── Application Tracker ────────────────────────────────────────────────────
+let appTracker = {};   // { jobId: { status, notes, job_title, institution, location, salary, posted, view_url } }
+
+async function loadAppTracker() {
+  if (!currentUser) return;
+  const { data } = await sbQuery(
+    _sb.from('job_applications').select('*').eq('user_id', currentUser.id),
+    8000, []
+  );
+  appTracker = {};
+  (data || []).forEach(r => { appTracker[r.job_id] = r; });
+}
+
+function renderTrackBtn(job) {
+  if (!currentUser) return '';
+  const tracked = appTracker[job.id];
+  const label = tracked ? `📋 ${tracked.status.charAt(0).toUpperCase() + tracked.status.slice(1)}` : '📋 Track';
+  const cls = tracked ? 'track-btn tracked' : 'track-btn';
+  return `<button class="${cls}" onclick="trackApplication('${esc(job.id)}',event)" title="Track your application status">${label}</button>`;
+}
+
+async function trackApplication(jobId, event) {
+  event.stopPropagation();
+  if (!currentUser) { openAuthModal('signin'); return; }
+  const job  = allJobs.find(j => j.id === jobId) || {};
+  const existing = appTracker[jobId];
+  if (existing) {
+    // Already tracked — open the tracker to show it
+    showTracker(); return;
+  }
+  // Add as "applied"
+  const row = {
+    user_id:     currentUser.id,
+    job_id:      jobId,
+    job_title:   job.title   || '',
+    institution: job.institution || '',
+    location:    job.location || '',
+    salary:      job.salary   || '',
+    posted:      job.posted   || '',
+    view_url:    job.view || job.apply || '',
+    status:      'applied',
+    notes:       '',
+  };
+  const { error } = await sbQuery(_sb.from('job_applications').upsert(row));
+  if (error) { alert('Could not track application: ' + error.message); return; }
+  appTracker[jobId] = row;
+  // Refresh the button in place
+  const btn = event.currentTarget;
+  btn.textContent = '📋 Applied';
+  btn.className = 'track-btn tracked';
+}
+
+async function updateAppStatus(jobId, newStatus) {
+  if (!currentUser) return;
+  const { error } = await sbQuery(_sb.from('job_applications')
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq('user_id', currentUser.id).eq('job_id', jobId));
+  if (error) { alert('Error: ' + error.message); return; }
+  if (appTracker[jobId]) appTracker[jobId].status = newStatus;
+  renderKanban();
+}
+
+async function updateAppNotes(jobId, notes) {
+  if (!currentUser) return;
+  await sbQuery(_sb.from('job_applications')
+    .update({ notes, updated_at: new Date().toISOString() })
+    .eq('user_id', currentUser.id).eq('job_id', jobId));
+  if (appTracker[jobId]) appTracker[jobId].notes = notes;
+}
+
+async function deleteApplication(jobId) {
+  if (!currentUser) return;
+  if (!confirm('Remove this job from your application tracker?')) return;
+  const { error } = await sbQuery(_sb.from('job_applications')
+    .delete().eq('user_id', currentUser.id).eq('job_id', jobId));
+  if (error) { alert('Error: ' + error.message); return; }
+  delete appTracker[jobId];
+  renderKanban();
+}
+
+const STATUS_MOVES = {
+  applied:      [['interviewing','→ Interviewing'], ['rejected','✕ Reject']],
+  interviewing: [['offered','🎉 Offer'], ['rejected','✕ Reject'], ['applied','← Applied']],
+  offered:      [['accepted','✓ Accept'], ['rejected','✕ Decline']],
+  rejected:     [['applied','↩ Re-open']],
+};
+
+function renderKanban() {
+  const statuses = ['applied','interviewing','offered','rejected'];
+  const byStatus = { applied:[], interviewing:[], offered:[], rejected:[] };
+
+  Object.values(appTracker).forEach(app => {
+    const s = app.status || 'applied';
+    if (byStatus[s]) byStatus[s].push(app);
+    else byStatus['applied'].push(app);
+  });
+
+  statuses.forEach(status => {
+    const col = document.getElementById('kcol-' + status);
+    const cnt = document.getElementById('kcount-' + status);
+    if (!col) return;
+    const apps = byStatus[status] || [];
+    cnt.textContent = apps.length;
+
+    if (!apps.length) {
+      col.innerHTML = `<p style="font-size:0.75rem;color:var(--text-3);text-align:center;padding:20px 0;">No jobs here yet</p>`;
+      return;
+    }
+
+    col.innerHTML = apps.map(app => {
+      const moves = (STATUS_MOVES[status] || []).map(([s, label]) =>
+        `<button class="kanban-move-btn" onclick="updateAppStatus('${app.job_id}','${s}')">${label}</button>`
+      ).join('');
+      const viewUrl = esc(app.view_url || '#');
+      return `
+        <div class="kanban-card">
+          <div class="kanban-card-title">
+            <a href="${viewUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;" onclick="event.stopPropagation()">${esc(app.job_title || 'Untitled')}</a>
+          </div>
+          <div class="kanban-card-meta">${esc(app.institution || '')}${app.salary ? ' · ' + esc(app.salary) : ''}</div>
+          <div class="kanban-card-actions">
+            ${moves}
+            <button class="kanban-move-btn del" onclick="deleteApplication('${app.job_id}')">🗑</button>
+          </div>
+          <textarea class="kanban-notes" placeholder="Notes…"
+            onchange="updateAppNotes('${app.job_id}', this.value)"
+            onblur="updateAppNotes('${app.job_id}', this.value)"
+          >${esc(app.notes || '')}</textarea>
+        </div>`;
+    }).join('');
+  });
+}
+
+async function showTracker() {
+  document.getElementById('user-menu-panel').classList.add('hidden');
+  if (!currentUser) { openAuthModal('signin'); return; }
+
+  document.getElementById('results-panel').classList.add('hidden');
+  document.getElementById('empty').classList.add('hidden');
+  document.getElementById('pagination').innerHTML = '';
+  document.getElementById('saved-panel').classList.add('hidden');
+
+  const panel = document.getElementById('tracker-panel');
+  panel.classList.remove('hidden');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  await loadAppTracker();
+  renderKanban();
+}
+
+function hideTracker() {
+  document.getElementById('tracker-panel').classList.add('hidden');
+  document.getElementById('results-panel').classList.remove('hidden');
+  applyFilters();
 }
 </script>
 </body>
