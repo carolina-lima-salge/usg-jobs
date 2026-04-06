@@ -91,6 +91,39 @@ with open(meta_path, "w") as f:
     json.dump(meta, f, separators=(",", ":"))
 print(f"Saved {meta_path.name}  ({meta_path.stat().st_size / 1024:.0f} KB)")
 
+# ── Compute top-5 similar jobs and inject into jobs.json ─────────────────────
+# Dot product matrix — since vectors are L2-normalised this equals cosine sim.
+# We process in chunks to avoid OOM on large corpora.
+print("\nComputing pairwise similarities for 'Similar Jobs' feature…")
+TOP_K    = 5
+CHUNK    = 256          # rows processed per batch
+n        = len(jobs)
+similar  = [None] * n   # will hold list of top-K neighbour IDs per job
+
+for start in range(0, n, CHUNK):
+    end   = min(start + CHUNK, n)
+    chunk = embeddings[start:end]          # (chunk_size, dims)
+    sims  = chunk @ embeddings.T           # (chunk_size, n)   dot products
+    for local_i, global_i in enumerate(range(start, end)):
+        row   = sims[local_i]
+        row[global_i] = -1                 # exclude self
+        top   = row.argsort()[::-1][:TOP_K]
+        similar[global_i] = [ids[j] for j in top]
+
+# Reload and patch jobs.json in-place
+jobs_data = json.loads(jobs_path.read_text())
+job_list  = jobs_data.get("jobs", [])
+id_to_sim = {ids[i]: similar[i] for i in range(n)}
+for job in job_list:
+    sim = id_to_sim.get(job["id"])
+    if sim:
+        job["similar"] = sim
+    else:
+        job.pop("similar", None)
+
+jobs_path.write_text(json.dumps(jobs_data, separators=(",", ":"), ensure_ascii=False))
+print(f"Injected 'similar' field into {len(job_list)} jobs in {jobs_path.name}")
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 print("\n✅  Done! Now commit and push to deploy:")
 print("    git add job_embeddings.bin job_embeddings_meta.json")

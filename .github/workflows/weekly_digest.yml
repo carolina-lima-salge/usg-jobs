@@ -1,0 +1,38 @@
+name: Weekly Email Digest
+
+on:
+  # Every Monday at 9 AM ET (2 PM UTC)
+  schedule:
+    - cron: '0 14 * * 1'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: 'Days to look back for new jobs (default 7)'
+        required: false
+        default: '7'
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run email digest
+        env:
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RESEND_API_KEY:       ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL:           ${{ secrets.FROM_EMAIL }}
+          SITE_URL:             ${{ secrets.SITE_URL }}
+          LOOKBACK_DAYS:        ${{ github.event.inputs.lookback_days || '7' }}
+        run: python3 scrapers/email_digest.py

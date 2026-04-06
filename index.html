@@ -850,13 +850,30 @@ function sourceBadgeClass(source) {
   return 'badge-onehcm';
 }
 
+// ── "New since last visit" ────────────────────────────────────────────────────
+// Track when the user last visited so we can badge jobs posted since then.
+let _lastVisitDate = null;
+(function initLastVisit() {
+  const stored = localStorage.getItem('usg_last_visit');
+  if (stored) {
+    const d = new Date(stored);
+    if (!isNaN(d.getTime())) _lastVisitDate = d;
+  }
+  // Always update to now — next visit sees everything since this moment as "new"
+  localStorage.setItem('usg_last_visit', new Date().toISOString());
+})();
+
 function newBadge(job) {
   if (!job.posted) return '';
   const d = parseDate(job.posted);
   if (!d) return '';
-  const age = Math.floor((Date.now() - d.getTime()) / 86400000);
-  if (age <= 1) return `<span class="badge badge-new">New</span>`;
-  return '';
+  // First-time visitors: no _lastVisitDate → fall back to 1-day rule only
+  if (!_lastVisitDate) {
+    const age = Math.floor((Date.now() - d.getTime()) / 86400000);
+    return age <= 1 ? `<span class="badge badge-new">New</span>` : '';
+  }
+  // Returning visitors: badge anything posted since their last visit
+  return d > _lastVisitDate ? `<span class="badge badge-new">New</span>` : '';
 }
 
 function closingBadge(job) {
@@ -1359,9 +1376,33 @@ function renderCard(job) {
       ${detailMeta ? `<div style="font-size:0.73rem;color:var(--text-2);margin-bottom:10px;display:flex;flex-wrap:wrap;align-items:center;">${detailMeta}</div>` : ''}
       ${summary}
       <div style="display:flex;flex-wrap:wrap;gap:8px;">${actionButtons}</div>
+      ${renderSimilarJobs(job)}
     </div>
   </div>
 </div>`;
+}
+
+function renderSimilarJobs(job) {
+  if (!job.similar || !job.similar.length || !allJobs.length) return '';
+  const matches = job.similar
+    .map(id => allJobs.find(j => j.id === id))
+    .filter(Boolean)
+    .slice(0, 5);
+  if (!matches.length) return '';
+  const chips = matches.map(j => `
+    <a href="${esc(j.view || j.apply || '#')}" target="_blank" rel="noopener"
+       style="display:block;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);
+              text-decoration:none;color:var(--text-1);background:var(--bg);transition:border-color .15s;font-size:0.78rem;line-height:1.4;"
+       onmouseover="this.style.borderColor='var(--accent)'"
+       onmouseout="this.style.borderColor='var(--border)'">
+      <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(j.title)}</div>
+      <div style="color:var(--text-2);font-size:0.73rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(j.institution)}${j.salary ? ' · ' + esc(j.salary) : ''}</div>
+    </a>`).join('');
+  return `
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+      <div style="font-size:0.72rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Similar Jobs</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;">${chips}</div>
+    </div>`;
 }
 
 function salaryTag(job) {
