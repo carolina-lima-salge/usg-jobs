@@ -2942,7 +2942,11 @@ function startStripeCheckout() {
     document.getElementById('sub-msg').className = 'auth-msg err';
     return;
   }
-  window.location.assign(link);
+  // Pass user ID + tier so the webhook can activate the subscription in Supabase
+  const url = new URL(link);
+  url.searchParams.set('client_reference_id', `${currentUser.id}|${_selectedTier}`);
+  if (currentUser.email) url.searchParams.set('prefilled_email', currentUser.email);
+  window.location.assign(url.toString());
 }
 
 // ── PayPal SDK loader ─────────────────────────────────────────────────────────
