@@ -1448,11 +1448,87 @@ def _faculty_parse_detail(html: str, card: dict) -> dict:
     return job
 
 
+def _faculty_fetch_detail_json(card: dict) -> dict | None:
+    """
+    Try to fetch full job details from the Interfolio JSON API.
+
+    Interfolio exposes /postings/{id}.json which returns structured data
+    for a single posting — no JS, no Playwright needed.
+
+    Returns a populated job dict on success, None on failure.
+    """
+    job_id = card.get("job_id", "")
+    if not job_id:
+        return None
+    json_url = f"{FACULTY_BASE}/postings/{job_id}.json"
+    try:
+        r = requests.get(
+            json_url,
+            headers={**HEADERS, "Accept": "application/json"},
+            timeout=20,
+        )
+        if r.status_code != 200:
+            return None
+        data = r.json()
+    except Exception:
+        return None
+
+    # Interfolio wraps the posting under a "posting" key
+    p = data.get("posting") or data
+    if not isinstance(p, dict):
+        return None
+
+    title = (
+        p.get("position_title") or p.get("title") or
+        p.get("name") or card.get("title", "")
+    ).strip()
+    if not title:
+        return None
+
+    # Pull description from body / description fields
+    desc_html = (
+        p.get("description") or p.get("body") or
+        p.get("job_description") or ""
+    )
+    sections = parse_html_sections(desc_html) if desc_html else {}
+
+    job = empty_job("Georgia State University")
+    job.update({
+        "job_id":      job_id,
+        "job_title":   title,
+        "department":  (p.get("department_name") or p.get("department") or
+                        p.get("college_name") or card.get("department", "")).strip(),
+        "location":    (p.get("location") or card.get("location", "Atlanta, Georgia")).strip(),
+        "posted_date": (p.get("open_date") or p.get("posted_date") or
+                        card.get("posted_date", "")).strip(),
+        "full_part_time": (p.get("position_type") or p.get("appointment_type") or "").strip(),
+        "salary":      (p.get("salary") or p.get("salary_range") or "").strip(),
+        "posting_url": card["url"],
+        "apply_link":  card["url"],
+    })
+    job.update(sections)
+    return job
+
+
 def _faculty_fetch_detail(page, card: dict, use_playwright: bool = False) -> dict:
-    """Fetch and parse a faculty job detail page."""
+    """Fetch and parse a faculty job detail page.
+
+    Strategy (fastest / most reliable first):
+      1. Interfolio JSON API  (/postings/{id}.json) — no JS, instant
+      2. requests HTML        — works if server-rendered, fast
+      3. Playwright           — JS-rendered fallback, slow but thorough
+      4. Card-data fallback   — title + date from the search listing
+    """
     url = card["url"]
     html = None
 
+    # ── 1. Try JSON API first — no JS needed, most reliable ───────────────────
+    json_job = _faculty_fetch_detail_json(card)
+    if json_job:
+        if DEBUG: print(f"    JSON API detail OK", flush=True)
+        return json_job
+
+    # ── 2. Try requests HTML ───────────────────────────────────────────────────
     def _html_is_garbled(h: str) -> bool:
         """Return True if the HTML looks like a JS-gated shell (no real content)."""
         text_start = BeautifulSoup(h, "lxml").get_text()[:200].lower().strip()
@@ -1472,6 +1548,7 @@ def _faculty_fetch_detail(page, card: dict, use_playwright: bool = False) -> dic
         except Exception as e:
             if DEBUG: print(f"    requests failed {url}: {e}")
 
+    # ── 3. Playwright fallback ─────────────────────────────────────────────────
     if html is None and page is not None:
         try:
             page.goto(url, wait_until="networkidle", timeout=45_000)
@@ -1486,16 +1563,22 @@ def _faculty_fetch_detail(page, card: dict, use_playwright: bool = False) -> dic
 
     if html:
         try:
-            return _faculty_parse_detail(html, card)
+            job = _faculty_parse_detail(html, card)
+            # Back-fill posted_date from card if HTML didn't provide one
+            if not job.get("posted_date") and card.get("posted_date"):
+                job["posted_date"] = card["posted_date"]
+            return job
         except Exception as e:
             if DEBUG: print(f"    parse error {url}: {e}")
 
+    # ── 4. Card-data fallback — always returns something ──────────────────────
     job = empty_job("Georgia State University")
     job.update({
         "job_id":      card.get("job_id", ""),
         "job_title":   card.get("title", ""),
         "department":  card.get("department", ""),
         "location":    card.get("location", "Atlanta, Georgia"),
+        "posted_date": card.get("posted_date", ""),   # ← preserve date from JSON listing
         "posting_url": url,
         "apply_link":  url,
     })

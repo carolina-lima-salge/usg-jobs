@@ -1149,7 +1149,8 @@ function applyFilters() {
 
     if (cutoff) {
       const d = parseDate(job.posted);
-      if (!d || d < cutoff) return false;
+      // Only filter by date if the job has a date — undated jobs always pass
+      if (d && d < cutoff) return false;
     }
 
     if (minSalary > 0) {
