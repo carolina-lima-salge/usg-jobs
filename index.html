@@ -2488,6 +2488,8 @@ _sb.auth.onAuthStateChange(async (event, session) => {
   updateHeaderUI();
   if (currentUser) {
     userProfile = undefined;  // mark as pending until loadProfile completes
+    // Re-render immediately so the banner hides while the profile loads
+    if (allJobs.length > 0) applyFilters();
     await loadSavedJobIds();
     await loadProfile();
     refreshSaveButtons();
@@ -2765,7 +2767,11 @@ let userProfile = undefined;  // undefined = not yet fetched; null = fetched, no
 
 async function loadProfile() {
   if (!currentUser) return;
-  const { data } = await _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  // Race the Supabase fetch against a 10-second timeout so a hanging
+  // network call doesn't keep the user in 'pending' tier forever.
+  const fetchPromise = _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ data: null }), 10000));
+  const { data } = await Promise.race([fetchPromise, timeoutPromise]);
   userProfile = data;
   // Show "Upgrade" for free users; basic users can upgrade to Pro; only Pro stays hidden
   const subBtn = document.getElementById('umenu-subscribe');
