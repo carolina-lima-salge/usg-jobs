@@ -1158,90 +1158,111 @@ def _faculty_collect_links_json(search_url: str, label: str) -> list[dict]:
     """
     Collect Interfolio faculty job listings via the JSON API.
 
-    Interfolio exposes the same search endpoint as JSON by appending .json
-    to the path, e.g.:
-        https://facultycareers.gsu.edu/postings/search.json?utf8=...
-    The response is:  {"postings": [...], "meta": {"total_count": N, ...}}
+    Tries two endpoints in order:
+      1. /postings.json?page=N&per_page=50  — simple list-all endpoint, most reliable
+      2. /postings/search.json?<original_qs>&page=N&per_page=50  — search-based endpoint
+
+    Both return:  {"postings": [...], "meta": {"total_count": N, ...}}
     Each posting has keys: id, position_title, department_name, location,
     open_date, close_date, position_type, ...
 
     Returns a list of card dicts in the same format used by
     _faculty_parse_listing_page so the rest of the pipeline is unchanged.
     """
-    # Convert the HTML search URL to JSON: insert .json before the ?
-    if "?" in search_url:
-        base_part, qs = search_url.split("?", 1)
-        json_url_base = base_part + ".json?" + qs
-    else:
-        json_url_base = search_url + ".json"
-
     session = requests.Session()
     session.headers.update({**HEADERS, "Accept": "application/json"})
 
-    cards   = []
-    page    = 1
-    per     = 50   # Interfolio default page size
+    per = 50  # Interfolio default page size
 
-    while True:
-        url = f"{json_url_base}&page={page}&per_page={per}"
-        if DEBUG: print(f"    JSON API page {page}: {url}", flush=True)
-        try:
-            r = session.get(url, timeout=30)
-            if r.status_code != 200:
-                if DEBUG: print(f"    JSON API HTTP {r.status_code}", flush=True)
+    # Build two candidate base URLs to try
+    if "?" in search_url:
+        base_part, qs = search_url.split("?", 1)
+        search_json_base = base_part + ".json?" + qs
+    else:
+        search_json_base = search_url + ".json?"
+        qs = ""
+
+    candidate_bases = [
+        (f"{FACULTY_BASE}/postings.json?", "postings.json"),
+        (search_json_base, "search.json"),
+    ]
+
+    for json_url_base, api_label in candidate_bases:
+        cards  = []
+        page   = 1
+        failed = False
+
+        print(f"    Trying {api_label} …", flush=True)
+        while True:
+            url = f"{json_url_base}&page={page}&per_page={per}"
+            try:
+                r = session.get(url, timeout=30)
+                print(f"    {api_label} page {page}: HTTP {r.status_code}", flush=True)
+                if r.status_code != 200:
+                    failed = True
+                    break
+                data = r.json()
+            except Exception as e:
+                print(f"    {api_label} error: {e}", flush=True)
+                failed = True
                 break
-            data = r.json()
-        except Exception as e:
-            if DEBUG: print(f"    JSON API error: {e}", flush=True)
-            break
 
-        postings = data.get("postings", [])
-        if not postings:
-            break
+            postings = data.get("postings", [])
+            if not postings:
+                print(f"    {api_label} page {page}: empty postings array — done", flush=True)
+                break
 
-        for p in postings:
-            pid   = str(p.get("id", ""))
-            title = (
-                p.get("position_title") or
-                p.get("title") or
-                p.get("name") or ""
-            ).strip()
-            dept  = (
-                p.get("department_name") or
-                p.get("department") or
-                p.get("college_name") or ""
-            ).strip()
-            loc   = (p.get("location") or "Atlanta, Georgia").strip()
-            posted = (p.get("open_date") or p.get("posted_date") or "").strip()
-            url_path = f"/postings/{pid}"
-            full_url  = urljoin(FACULTY_BASE, url_path)
+            for p in postings:
+                pid   = str(p.get("id", ""))
+                title = (
+                    p.get("position_title") or
+                    p.get("title") or
+                    p.get("name") or ""
+                ).strip()
+                dept  = (
+                    p.get("department_name") or
+                    p.get("department") or
+                    p.get("college_name") or ""
+                ).strip()
+                loc    = (p.get("location") or "Atlanta, Georgia").strip()
+                posted = (p.get("open_date") or p.get("posted_date") or "").strip()
+                url_path = f"/postings/{pid}"
+                full_url  = urljoin(FACULTY_BASE, url_path)
 
-            if not pid or not title:
-                continue
+                if not pid or not title:
+                    continue
 
-            cards.append({
-                "job_id":      pid,
-                "url":         full_url,
-                "title":       title,
-                "department":  dept,
-                "location":    loc,
-                "posted_date": posted,
-                "section":     label,
-            })
+                cards.append({
+                    "job_id":      pid,
+                    "url":         full_url,
+                    "title":       title,
+                    "department":  dept,
+                    "location":    loc,
+                    "posted_date": posted,
+                    "section":     label,
+                })
 
-        print(f"    {label} JSON page {page}: +{len(postings)}  total {len(cards)}", flush=True)
+            print(f"    {api_label} page {page}: +{len(postings)}  total {len(cards)}", flush=True)
 
-        # Pagination: check meta or stop when fewer than per_page returned
-        meta        = data.get("meta", {})
-        total_count = meta.get("total_count", meta.get("total", 0))
-        if total_count and len(cards) >= total_count:
-            break
-        if len(postings) < per:
-            break
-        page += 1
-        time.sleep(PAGE_DELAY)
+            meta        = data.get("meta", {})
+            total_count = meta.get("total_count", meta.get("total", 0))
+            if total_count and len(cards) >= total_count:
+                break
+            if len(postings) < per:
+                break
+            page += 1
+            time.sleep(PAGE_DELAY)
 
-    return cards
+        if not failed and cards:
+            print(f"    {api_label} succeeded: {len(cards)} listings found.", flush=True)
+            return cards
+
+        if failed:
+            print(f"    {api_label} failed — trying next endpoint …", flush=True)
+        else:
+            print(f"    {api_label} returned 0 listings — trying next endpoint …", flush=True)
+
+    return []
 
 
 def _faculty_has_next_page(soup: BeautifulSoup, current_page: int) -> bool:
