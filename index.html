@@ -3224,6 +3224,7 @@ async function trackApplication(jobId, event) {
   const btn = event.currentTarget;
   btn.textContent = '📋 Applied';
   btn.className = 'track-btn tracked';
+  _showShareToast('✅ Added to Applied in My Applications');
 }
 
 async function updateAppStatus(jobId, newStatus) {
