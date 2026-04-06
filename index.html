@@ -1549,16 +1549,11 @@ document.getElementById('search').addEventListener('input', onSearchInput);
 ['f-type','f-employment','f-posted','f-sort','f-min-salary'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); saveStateToHash(); });
 });
-document.getElementById('f-salary').addEventListener('change',  () => { currentPage = 1; applyFilters(); saveStateToHash(); });
-document.getElementById('f-remote').addEventListener('change',  () => { currentPage = 1; applyFilters(); saveStateToHash(); });
-
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
   ['f-type','f-employment','f-posted','f-sort','f-min-salary'].forEach(id => {
     document.getElementById(id).value = id === 'f-sort' ? 'newest' : '';
   });
-  document.getElementById('f-salary').checked = false;
-  document.getElementById('f-remote').checked = false;
 
   // Clear multi-selects
   selectedInsts.clear();
