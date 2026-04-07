@@ -1,9 +1,10 @@
-name: Weekly Email Digest
+name: Daily Email Digest
 
 on:
-  # Every Monday at 9 AM ET (2 PM UTC)
+  # Every day at 10 AM ET (3 PM UTC) — after the merge+deploy workflow
+  # Pro users receive daily; free users receive weekly (logic handled in script)
   schedule:
-    - cron: '0 14 * * 1'
+    - cron: '0 15 * * *'
 
   # Allow manual trigger for testing
   workflow_dispatch:

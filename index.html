@@ -692,6 +692,8 @@
       <select id="f-sort" class="filter-select">
         <option value="newest">Newest first</option>
         <option value="oldest">Oldest first</option>
+        <option value="salary-high">Highest salary</option>
+        <option value="salary-low">Lowest salary</option>
       </select>
 
       <!-- Min salary filter -->
@@ -1170,16 +1172,8 @@ function parseSalaryNum(job) {
 let freeSampleSet = null;  // Set<jobId> — 50 random jobs for free users
 
 function updateFreeSample() {
-  const tier = getUserTier();
-  if (tier !== 'free') {
-    freeSampleSet = null;   // paid/pending users see everything
-    return;
-  }
-  // Build (or keep) the session-consistent random sample
-  if (!freeSampleSet && allJobs.length > 0) {
-    const shuffled = [...allJobs].sort(() => Math.random() - 0.5);
-    freeSampleSet  = new Set(shuffled.slice(0, 50).map(j => j.id));
-  }
+  // Free users now see all job listings — no sample restriction
+  freeSampleSet = null;
 }
 
 let searchTimer = null;
@@ -1238,7 +1232,7 @@ function applyFilters() {
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || sort !== 'newest';
+  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || (sort && sort !== 'newest');
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
@@ -1280,6 +1274,14 @@ function applyFilters() {
     filtered.sort((a, b) => (cvScores[b.id] || 0) - (cvScores[a.id] || 0));
   } else if (sort === 'oldest') {
     filtered.sort((a, b) => dateOf(a) - dateOf(b));
+  } else if (sort === 'salary-high') {
+    filtered.sort((a, b) => (parseSalaryNum(b) || 0) - (parseSalaryNum(a) || 0));
+  } else if (sort === 'salary-low') {
+    filtered.sort((a, b) => {
+      const sa = parseSalaryNum(a) || Infinity;
+      const sb = parseSalaryNum(b) || Infinity;
+      return sa - sb;
+    });
   } else {
     // Default: newest first
     filtered.sort((a, b) => dateOf(b) - dateOf(a));
@@ -1291,13 +1293,10 @@ function applyFilters() {
   if (arrow && colEl) {
     const isDate = sort === 'newest' || sort === 'oldest';
     colEl.classList.toggle('sort-active', isDate);
-    arrow.textContent = sort === 'newest' ? '↓' : sort === 'oldest' ? '↑' : '↕';
+    arrow.textContent = sort === 'newest' ? '↓' : sort === 'oldest' ? '↑' : sort === 'salary-high' ? '↓$' : sort === 'salary-low' ? '↑$' : '↕';
   }
 
-  // Free-tier: restrict anonymous visitors to 50-job random sample
-  if (!currentUser && freeSampleSet) {
-    filtered = filtered.filter(j => freeSampleSet.has(j.id));
-  }
+  // All users (including anonymous) see the full job list
 
   currentPage = 1;
   render();
@@ -1320,17 +1319,9 @@ function render() {
   document.getElementById('result-count').textContent =
     `${total.toLocaleString()} position${total !== 1 ? 's' : ''}`;
 
-  // Show/hide free-tier upgrade banner
+  // Hide free-tier banner — free users now see all listings
   const freeBanner = document.getElementById('free-tier-banner');
-  if (freeBanner) {
-    const _tier = getUserTier();
-    if (_tier === 'free' && allJobs.length > 50) {
-      document.getElementById('free-tier-total').textContent = allJobs.length.toLocaleString() + ' total';
-      freeBanner.classList.remove('hidden');
-    } else {
-      freeBanner.classList.add('hidden');
-    }
-  }
+  if (freeBanner) freeBanner.classList.add('hidden');
 
   const container = document.getElementById('results');
   const panel     = document.getElementById('results-panel');
@@ -2477,39 +2468,27 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
     <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:20px;">Click a plan to select it, then pay below.</p>
 
     <!-- Tier cards -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;" id="tier-cards">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;" id="tier-cards">
 
       <!-- T1: Free -->
       <div class="tier-card" id="tier-card-free" onclick="selectTier('free')">
         <div style="font-size:0.88rem;font-weight:700;color:var(--text-2);">Free</div>
         <div class="tier-price">$0</div>
-        <div class="tier-feature">✅ 50 job listings</div>
-        <div class="tier-feature">✅ All search &amp; filters</div>
-        <div class="tier-feature muted">— Email alerts</div>
-        <div class="tier-feature muted">— Save jobs</div>
-        <div class="tier-feature muted">— CV matching</div>
-        <div class="tier-feature muted">— AI career coach</div>
-      </div>
-
-      <!-- T2: Basic -->
-      <div class="tier-card tier-selected" id="tier-card-basic" onclick="selectTier('basic')">
-        <div style="font-size:0.88rem;font-weight:700;color:var(--accent);">Basic</div>
-        <div class="tier-price">$5<span> / month</span></div>
         <div class="tier-feature">✅ All job listings</div>
         <div class="tier-feature">✅ All search &amp; filters</div>
-        <div class="tier-feature">✅ Daily email alerts</div>
-        <div class="tier-feature">✅ Save unlimited jobs</div>
+        <div class="tier-feature">✅ Weekly email alerts</div>
+        <div class="tier-feature muted">— Application tracking</div>
         <div class="tier-feature muted">— CV matching</div>
         <div class="tier-feature muted">— AI career coach</div>
       </div>
 
-      <!-- T3: Pro -->
-      <div class="tier-card tier-popular" id="tier-card-pro" onclick="selectTier('pro')">
+      <!-- T2: Pro -->
+      <div class="tier-card tier-popular tier-selected" id="tier-card-pro" onclick="selectTier('pro')">
         <div style="font-size:0.88rem;font-weight:700;color:#7c3aed;">Pro ✨</div>
-        <div class="tier-price" style="color:#7c3aed;">$10<span> / month</span></div>
-        <div class="tier-feature">✅ Everything in Basic</div>
-        <div class="tier-feature">✅ All job listings</div>
+        <div class="tier-price" style="color:#7c3aed;">$7<span> / month</span></div>
+        <div class="tier-feature">✅ Everything in Free</div>
         <div class="tier-feature">✅ Daily email alerts</div>
+        <div class="tier-feature">✅ Application tracking</div>
         <div class="tier-feature">✅ CV upload &amp; matching</div>
         <div class="tier-feature">✅ AI career coach</div>
       </div>
@@ -2524,7 +2503,7 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
     </div>
     <!-- Current plan note for free -->
     <div id="sub-free-note" class="hidden" style="text-align:center;padding:14px 0;font-size:0.82rem;color:var(--text-2);">
-      You're on the free plan. Select Basic or Pro above to upgrade.
+      You're on the free plan. Select Pro above to unlock all features.
     </div>
 
     <div class="auth-msg" id="sub-msg" style="margin-top:8px;"></div>
@@ -2538,7 +2517,7 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
       <span style="font-size:1rem;font-weight:700;">🔔 Email alerts</span>
       <button onclick="closeAlertSettings()" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:1.2rem;padding:2px 6px;">✕</button>
     </div>
-    <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:16px;">Get a daily digest of new jobs matching your criteria.</p>
+    <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:16px;" id="al-freq-note">Get a weekly digest of new jobs matching your criteria. <span id="al-upgrade-note" class="hidden" style="color:var(--accent);cursor:pointer;" onclick="showSubscribePage()">Upgrade to Pro for daily alerts.</span></p>
 
     <label style="display:block;font-size:0.78rem;font-weight:600;margin-bottom:4px;color:var(--text-1);">Keywords (comma-separated)</label>
     <input class="auth-input" type="text" id="al-keywords" placeholder="e.g. professor, data science, nursing" />
@@ -2555,7 +2534,7 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
 
     <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--text-1);margin-bottom:18px;cursor:pointer;">
       <input type="checkbox" id="al-active" style="accent-color:var(--accent);" checked />
-      Send daily email alerts
+      <span id="al-active-label">Send email alerts</span>
     </label>
 
     <button class="auth-btn-primary" onclick="saveAlertPrefs()">Save preferences</button>
@@ -3002,7 +2981,9 @@ function getUserTier() {
   if (!currentUser) return 'free';
   if (userProfile === undefined) return 'pending'; // profile not loaded yet — don't restrict
   if (userProfile?.subscription_status === 'active') {
-    return userProfile?.subscription_tier || 'basic';
+    // 'basic' is treated as 'pro' under the new 2-tier system
+    const t = userProfile?.subscription_tier || 'pro';
+    return t === 'basic' ? 'pro' : t;
   }
   return 'free';
 }
@@ -3154,6 +3135,15 @@ async function showAlertSettings() {
   }
   document.getElementById('al-msg').textContent = '';
 
+  // Show weekly vs daily note based on tier
+  const isPro = getUserTier() === 'pro';
+  document.getElementById('al-freq-note').firstChild.textContent =
+    isPro ? 'Get a daily digest of new jobs matching your criteria. ' : 'Get a weekly digest of new jobs matching your criteria. ';
+  const upgradeNote = document.getElementById('al-upgrade-note');
+  if (upgradeNote) upgradeNote.classList.toggle('hidden', isPro);
+  document.getElementById('al-active-label').textContent =
+    isPro ? 'Send daily email alerts' : 'Send weekly email alerts';
+
   const overlay = document.getElementById('alerts-overlay');
   overlay.classList.remove('hidden');
 }
@@ -3204,6 +3194,7 @@ function renderTrackBtn(job) {
 async function trackApplication(jobId, event) {
   event.stopPropagation();
   if (!currentUser) { openAuthModal('signin'); return; }
+  if (getUserTier() !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
   // Capture button reference NOW — event.currentTarget becomes null after any await
   const btn = event.currentTarget;
   const job  = allJobs.find(j => j.id === jobId) || {};

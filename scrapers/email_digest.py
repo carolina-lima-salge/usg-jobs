@@ -106,11 +106,8 @@ if not prefs:
 
 # Fetch email addresses for each user_id from auth.users via profiles table
 user_ids = list({p["user_id"] for p in prefs})
-# Supabase REST can filter with ?id=in.(...) on the profiles table
-id_filter = "id=in.(" + ",".join(user_ids) + ")&select=id,email:id"
 try:
-    # profiles may not have email — fetch from auth.users via a view
-    # Fall back to using supabase admin list users endpoint
+    # Fetch from auth admin endpoint to get emails
     url = f"{SUPABASE_URL}/auth/v1/admin/users?per_page=1000"
     req = urllib.request.Request(url, headers={
         "apikey":        SERVICE_KEY,
@@ -123,6 +120,27 @@ except Exception as e:
     print(f"WARNING: Could not fetch user emails: {e}")
     user_email_map = {}
 
+# Fetch subscription tiers from profiles table to determine daily vs weekly
+try:
+    id_list = ",".join(user_ids)
+    profiles = sb_get("profiles", f"id=in.({id_list})&select=id,subscription_status,subscription_tier")
+    user_tier_map = {}
+    for p in profiles:
+        status = p.get("subscription_status") or ""
+        tier   = p.get("subscription_tier") or ""
+        # Pro users (active subscription) get daily; everyone else gets weekly
+        user_tier_map[p["id"]] = "pro" if status == "active" else "free"
+except Exception as e:
+    print(f"WARNING: Could not fetch subscription tiers: {e}")
+    user_tier_map = {}
+
+# Pre-compute cutoffs for each frequency
+now_utc   = datetime.now(timezone.utc)
+is_monday = now_utc.weekday() == 0   # 0 = Monday
+cutoff_daily  = now_utc - timedelta(days=1)
+cutoff_weekly = now_utc - timedelta(days=7)
+print(f"Today is {'Monday' if is_monday else 'not Monday'} — free users {'will' if is_monday else 'will NOT'} receive digest today")
+
 # ── Filter jobs per user and send ─────────────────────────────────────────────
 sent = skipped = errors = 0
 
@@ -132,6 +150,22 @@ for pref in prefs:
     if not email:
         skipped += 1
         continue
+
+    # Determine frequency based on subscription tier
+    user_tier   = user_tier_map.get(uid, "free")
+    is_pro      = user_tier == "pro"
+    freq_label  = "daily" if is_pro else "weekly"
+
+    # Free users only receive on Mondays; pro users receive every day
+    if not is_pro and not is_monday:
+        skipped += 1
+        continue
+
+    user_cutoff = cutoff_daily if is_pro else cutoff_weekly
+    user_cutoff_str = user_cutoff.date().isoformat()
+
+    # Jobs within this user's lookback window
+    user_recent = [j for j in all_jobs if (j.get("posted") or "") >= user_cutoff_str]
 
     keywords  = [k.strip().lower() for k in re.split(r"[,\s]+", pref.get("keywords") or "") if k.strip()]
     min_sal   = int(pref.get("min_salary") or 0)
@@ -159,13 +193,13 @@ for pref in prefs:
                 return False
         return True
 
-    matched = [j for j in recent_jobs if matches(j)]
+    matched = [j for j in user_recent if matches(j)]
     if not matched:
         skipped += 1
         continue
 
     # ── Build HTML email ─────────────────────────────────────────────────────
-    subject = f"USG Jobs Digest — {len(matched)} new {'job' if len(matched) == 1 else 'jobs'} matching your alerts"
+    subject = f"USG Jobs {'Daily' if is_pro else 'Weekly'} Digest — {len(matched)} new {'job' if len(matched) == 1 else 'jobs'} matching your alerts"
 
     def job_card_html(j):
         sal   = f" &nbsp;·&nbsp; {j['salary']}" if j.get("salary") else ""
@@ -199,7 +233,7 @@ for pref in prefs:
     <!-- Header -->
     <div style="background:#1d4ed8;padding:24px 28px;border-radius:10px 10px 0 0;">
       <a href="{SITE_URL}" style="font-size:20px;font-weight:700;color:#fff;text-decoration:none;">USG Jobs</a>
-      <p style="margin:6px 0 0;color:#bfdbfe;font-size:14px;">Your weekly job digest</p>
+      <p style="margin:6px 0 0;color:#bfdbfe;font-size:14px;">Your {freq_label} job digest</p>
     </div>
 
     <!-- Body -->
