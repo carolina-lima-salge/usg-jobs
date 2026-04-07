@@ -1473,6 +1473,8 @@ def _faculty_parse_detail(html: str, card: dict) -> dict:
                 if not job["location"]: job["location"] = val
             elif any(k in label for k in ("position type", "appointment type", "rank", "type")):
                 if not job["full_part_time"]: job["full_part_time"] = val
+            elif any(k in label for k in ("salary", "compensation", "pay range", "stipend")):
+                if not job["salary"]: job["salary"] = val
             elif any(k in label for k in ("open date", "posted", "opening")):
                 if not job["posted_date"]: job["posted_date"] = val
             elif any(k in label for k in ("close date", "closing", "deadline")):
@@ -1578,7 +1580,8 @@ def _faculty_fetch_detail_json(card: dict) -> dict | None:
         "posted_date": (p.get("open_date") or p.get("posted_date") or
                         card.get("posted_date", "")).strip(),
         "full_part_time": (p.get("position_type") or p.get("appointment_type") or "").strip(),
-        "salary":      (p.get("salary") or p.get("salary_range") or "").strip(),
+        "salary":      (p.get("salary") or p.get("salary_range") or
+                        p.get("compensation") or p.get("stipend") or "").strip(),
         "posting_url": card["url"],
         "apply_link":  card["url"],
     })
@@ -1606,11 +1609,20 @@ def _faculty_fetch_detail(page, card: dict, use_playwright: bool = False) -> dic
 
     # ── 2. Try requests HTML ───────────────────────────────────────────────────
     def _html_is_garbled(h: str) -> bool:
-        """Return True if the HTML looks like a JS-gated shell (no real content)."""
-        text_start = BeautifulSoup(h, "lxml").get_text()[:200].lower().strip()
-        return text_start.startswith("toggle navigation") or (
-            "toggle navigation" in text_start[:100]
-        )
+        """Return True if the HTML looks like a JS-gated shell (no real content).
+
+        Interfolio pages always contain "Toggle navigation" in their nav bar,
+        even when fully rendered.  Only treat the page as garbled if it also
+        has very little text content (< 1500 chars) and no <dl> metadata
+        tables — those two things are present on every real detail page.
+        """
+        soup = BeautifulSoup(h, "lxml")
+        full_text = soup.get_text().strip()
+        # Real pages have substantial text AND at least one <dl> metadata block
+        if len(full_text) > 1500 and soup.find("dl"):
+            return False
+        text_start = full_text[:200].lower()
+        return "toggle navigation" in text_start[:100]
 
     if not use_playwright:
         try:
