@@ -1554,6 +1554,10 @@ def _faculty_fetch_detail_json(card: dict) -> dict | None:
         p.get("position_title") or p.get("title") or
         p.get("name") or card.get("title", "")
     ).strip()
+    # If the individual JSON returned a college/unit name, prefer the listing
+    # card's title (which came from the search-results page and is reliable).
+    if title.lower() in _GSU_UNIT_NAMES:
+        title = card.get("title", "").strip()
     if not title:
         return None
 
