@@ -1701,6 +1701,13 @@ def scrape_faculty(page, portal_urls: list[tuple[str,str]]) -> list[dict]:
 
         for c in cards:
             if c["job_id"] not in seen_ids:
+                # Skip any card whose title is a known college/unit name — these
+                # are Interfolio organisational entries, not real job postings.
+                card_title = c.get("title", "").strip().lower()
+                if card_title and card_title in _GSU_UNIT_NAMES:
+                    print(f"  [skip card] '{c['title']}' — unit name, not a job title",
+                          flush=True)
+                    continue
                 seen_ids.add(c["job_id"])
                 all_cards.append(c)
 
@@ -1718,6 +1725,10 @@ def scrape_faculty(page, portal_urls: list[tuple[str,str]]) -> list[dict]:
 
         print(f"  [{i}/{len(all_cards)}] {card['title'][:55]} …", end=" ", flush=True)
         job = _faculty_fetch_detail(page, card)
+        # Final guard: skip if the resolved title is still a unit/college name
+        if job.get("job_title", "").strip().lower() in _GSU_UNIT_NAMES:
+            print(f"SKIP (unit name title)", flush=True)
+            continue
         jobs.append(job)
         print("✓", flush=True)
 
