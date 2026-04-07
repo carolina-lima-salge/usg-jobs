@@ -1454,35 +1454,60 @@ def _faculty_parse_detail(html: str, card: dict) -> dict:
     if not job["job_title"] or job["job_title"].strip().lower() in _GSU_UNIT_NAMES:
         job["job_title"] = card.get("title", "")
 
-    # ── Metadata: dl/dt/dd pairs ───────────────────────────────────────────────
-    # Interfolio puts metadata in <dl> with <dt> labels and <dd> values,
-    # sometimes with class="dl-horizontal".
+    # ── Metadata: dl/dt/dd pairs AND ul.posting-categories li items ────────────
+    # Interfolio uses two common structures:
+    #   A) <dl> with <dt> label / <dd> value pairs
+    #   B) <ul class="posting-categories"> with <li> containing label+value spans
+
+    def _apply_meta(label: str, val: str):
+        """Map a label/value pair into the job dict."""
+        label = label.lower().rstrip(": ")
+        if not val:
+            return
+        if any(k in label for k in ("department", "unit", "college", "school", "division")):
+            if not job["department"]: job["department"] = val
+        elif any(k in label for k in ("location", "campus", "city")):
+            if not job["location"]: job["location"] = val
+        elif any(k in label for k in ("position type", "appointment type", "rank", "type")):
+            if not job["full_part_time"]: job["full_part_time"] = val
+        elif any(k in label for k in ("salary", "compensation", "pay range", "stipend")):
+            if not job["salary"]: job["salary"] = val
+        elif any(k in label for k in ("open date", "posted", "opening")):
+            if not job["posted_date"]: job["posted_date"] = val
+        elif any(k in label for k in ("close date", "closing", "deadline")):
+            extra = f"Close date: {val}"
+            job["other_information"] = (
+                (job["other_information"] + "  " + extra).strip()
+                if job["other_information"] else extra
+            )
+
+    # Structure A: dl/dt/dd
     for dl in soup.find_all("dl"):
-        dts = dl.find_all("dt")
-        for dt in dts:
-            label = clean(dt.get_text()).lower().rstrip(": ")
+        for dt in dl.find_all("dt"):
             dd = dt.find_next_sibling("dd")
-            if not dd:
-                continue
-            val = clean(dd.get_text())
-            if not val:
-                continue
-            if any(k in label for k in ("department", "unit", "college", "school", "division")):
-                if not job["department"]: job["department"] = val
-            elif any(k in label for k in ("location", "campus", "city")):
-                if not job["location"]: job["location"] = val
-            elif any(k in label for k in ("position type", "appointment type", "rank", "type")):
-                if not job["full_part_time"]: job["full_part_time"] = val
-            elif any(k in label for k in ("salary", "compensation", "pay range", "stipend")):
-                if not job["salary"]: job["salary"] = val
-            elif any(k in label for k in ("open date", "posted", "opening")):
-                if not job["posted_date"]: job["posted_date"] = val
-            elif any(k in label for k in ("close date", "closing", "deadline")):
-                extra = f"Close date: {val}"
-                job["other_information"] = (
-                    (job["other_information"] + "  " + extra).strip()
-                    if job["other_information"] else extra
-                )
+            if dd:
+                _apply_meta(clean(dt.get_text()), clean(dd.get_text()))
+
+    # Structure B: ul.posting-categories > li with two child spans (label + value)
+    for ul in soup.select("ul.posting-categories, ul[class*='posting-cat'], ul[class*='job-meta']"):
+        for li in ul.find_all("li"):
+            spans = li.find_all("span")
+            if len(spans) >= 2:
+                _apply_meta(clean(spans[0].get_text()), clean(spans[1].get_text()))
+            elif len(spans) == 1:
+                # Some portals use <strong> label + trailing text
+                strong = li.find(["strong", "b"])
+                if strong:
+                    label_text = clean(strong.get_text())
+                    val_text = clean(li.get_text().replace(strong.get_text(), ""))
+                    _apply_meta(label_text, val_text)
+
+    # Structure C: generic label/value divs (e.g. <div class="field-label">Salary</div>)
+    for div in soup.select("div[class*='field'], div[class*='meta'], div[class*='posting-info']"):
+        label_el = div.select_one("[class*='label'], [class*='key'], strong, b, dt")
+        value_el = div.select_one("[class*='value'], [class*='val'], dd, span:not([class*='label'])")
+        if label_el and value_el:
+            _apply_meta(clean(label_el.get_text()), clean(value_el.get_text()))
 
     # ── Apply link ─────────────────────────────────────────────────────────────
     apply_el = (
@@ -1609,25 +1634,19 @@ def _faculty_fetch_detail(page, card: dict, use_playwright: bool = False) -> dic
 
     # ── 2. Try requests HTML ───────────────────────────────────────────────────
     def _html_is_garbled(h: str) -> bool:
-        """Return True if the HTML looks like a JS-gated shell (no real content).
+        """Return True if the HTML looks like a JS-gated shell with no real content.
 
-        Interfolio pages always contain "Toggle navigation" in their nav bar,
-        even when fully rendered.  Only treat the page as garbled if it also
-        has very little text content (< 1500 chars) and no <dl> metadata
-        tables — those two things are present on every real detail page.
+        Interfolio pages always start with 'Toggle navigation' in the nav bar
+        even when fully rendered — so we can't use that as the sole signal.
+        A skeleton shell page has very little text (< 800 chars total).
         """
         soup = BeautifulSoup(h, "lxml")
-        full_text = soup.get_text().strip()
-        # Real pages have substantial text AND at least one <dl> metadata block
-        if len(full_text) > 1500 and soup.find("dl"):
-            return False
-        text_start = full_text[:200].lower()
-        return "toggle navigation" in text_start[:100]
+        return len(soup.get_text().strip()) < 800
 
     if not use_playwright:
         try:
             r = requests.get(url, headers=HEADERS, timeout=30)
-            if r.status_code == 200 and len(r.text) > 5_000:
+            if r.status_code == 200 and len(r.text) > 2_000:
                 if _html_is_garbled(r.text):
                     if DEBUG:
                         print(f"    requests HTML is garbled (JS-gated) — trying Playwright")
@@ -1637,17 +1656,26 @@ def _faculty_fetch_detail(page, card: dict, use_playwright: bool = False) -> dic
             if DEBUG: print(f"    requests failed {url}: {e}")
 
     # ── 3. Playwright fallback ─────────────────────────────────────────────────
+    # Playwright always gets the fully rendered page — never treat it as garbled.
     if html is None and page is not None:
         try:
             page.goto(url, wait_until="networkidle", timeout=45_000)
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(3000)
             html = page.content()
-            if _html_is_garbled(html):
+            if len(html) < 2_000:
                 if DEBUG:
-                    print(f"    Playwright HTML also garbled — skipping {url}")
+                    print(f"    Playwright returned almost-empty page — skipping {url}")
                 html = None
         except Exception as e:
             if DEBUG: print(f"    playwright failed {url}: {e}")
+
+    # Save first detail page HTML for debugging selector issues
+    if html and not Path("debug_faculty_detail_sample.html").exists():
+        try:
+            Path("debug_faculty_detail_sample.html").write_text(html, encoding="utf-8")
+            print(f"    [debug] saved faculty detail HTML sample", flush=True)
+        except Exception:
+            pass
 
     if html:
         try:
