@@ -1435,22 +1435,28 @@ def _faculty_parse_detail(html: str, card: dict) -> dict:
     job["location"]    = card.get("location", "Atlanta, Georgia")
 
     # ── Title ──────────────────────────────────────────────────────────────────
+    # The GSU Interfolio page has <h1 class='header-text'>Perimeter College</h1>
+    # in the site header and the *real* job title in an <h2> inside #content_inner.
+    # Try the inner-content h2 first, then fall back to other selectors.
     for sel in [
+        "#content_inner h2",
+        "#content h2",
+        "h2.posting-header",
+        "h2.job-title",
+        "h2",
         "h1.posting-header",
         "h1.job-title",
         ".posting-header",
-        "h1",
         ".posting-title",
     ]:
         el = soup.select_one(sel)
         if el:
             t = clean(el.get_text())
-            if t:
+            if t and t.lower() not in _GSU_UNIT_NAMES:
                 job["job_title"] = t
                 break
-    # If the detail page returned a college/unit name as the title (e.g. the
-    # page's first h1 is a breadcrumb like "Perimeter College"), discard it and
-    # fall back to the correct title already scraped from the listing card.
+    # If the detail page still returned a college/unit name as the title, fall
+    # back to the correct title already scraped from the listing card.
     if not job["job_title"] or job["job_title"].strip().lower() in _GSU_UNIT_NAMES:
         job["job_title"] = card.get("title", "")
 
@@ -1509,6 +1515,33 @@ def _faculty_parse_detail(html: str, card: dict) -> dict:
         if label_el and value_el:
             _apply_meta(clean(label_el.get_text()), clean(value_el.get_text()))
 
+    # Structure D: <table> with <th> label / <td> value rows
+    # This is the primary structure on facultycareers.gsu.edu detail pages.
+    # Each <tr> has a <th> with the field name and a <td> with the value.
+    _desc_rows = []  # collect description-like rows to build the full description
+    for table in soup.find_all("table"):
+        for tr in table.find_all("tr"):
+            th = tr.find("th")
+            td = tr.find("td")
+            if not th or not td:
+                continue
+            label = clean(th.get_text())
+            val   = clean(td.get_text())
+            val_html = str(td)
+            if not label:
+                continue
+            label_lower = label.lower()
+            # Description-like fields — accumulate for the description body
+            if any(k in label_lower for k in (
+                "position description", "description",
+                "required education", "preferred qualifications",
+                "knowledge, skills", "pre-employment",
+                "responsibilities", "duties",
+            )):
+                _desc_rows.append(f"<h3>{label}</h3>{val_html}")
+            else:
+                _apply_meta(label, val)
+
     # ── Apply link ─────────────────────────────────────────────────────────────
     apply_el = (
         soup.select_one("#apply-button-top a[href]") or
@@ -1534,13 +1567,23 @@ def _faculty_parse_detail(html: str, card: dict) -> dict:
         if el:
             desc_parts.append(str(el))
 
+    # If we collected description rows from the table (Structure D), use them.
+    if not desc_parts and _desc_rows:
+        desc_parts = _desc_rows
+
     if not desc_parts:
-        # Generic fallback — everything after the <h1>
-        h1 = soup.find("h1")
-        if h1:
-            desc_parts = [str(s) for s in h1.find_all_next(["div","p","ul","ol","h2","h3","h4"])]
+        # Generic fallback — everything after the first heading in content area
+        content = soup.select_one("#content_inner, #content, main, .main-content")
+        if content:
+            h2 = content.find("h2")
+            start = h2 or content
+            desc_parts = [str(s) for s in start.find_all_next(["div", "p", "ul", "ol", "h2", "h3", "h4", "table"])]
         else:
-            desc_parts = [str(soup)]
+            h1 = soup.find("h1")
+            if h1:
+                desc_parts = [str(s) for s in h1.find_all_next(["div", "p", "ul", "ol", "h2", "h3", "h4"])]
+            else:
+                desc_parts = [str(soup)]
 
     sections = parse_html_sections(" ".join(desc_parts))
     job.update(sections)
