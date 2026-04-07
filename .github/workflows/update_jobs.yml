@@ -101,14 +101,18 @@ jobs:
           else
             TOTAL=$(python3 -c "import json; d=json.load(open('jobs.json')); print(d['meta']['total'])")
             git commit -m "Auto-update jobs data: ${TOTAL} listings [skip ci]"
-            # Use merge instead of rebase to avoid "untracked file would be overwritten"
-            # errors during the rebase checkout dance. Merge -X ours keeps our
-            # freshly-scraped data files when there are conflicts.
             git fetch origin main
-            # Remove any scraper-generated files that are not in the commit
-            # so they can never block the merge with "untracked file" errors.
-            rm -f scrapers/gastate_jobs.csv scrapers/gastate_jobs.json
-            rm -f scrapers/usg_all_jobs.csv scrapers/usg_all_jobs.json
+            # Fully clean the working tree before merging so git never sees
+            # "local changes would be overwritten" or "untracked file" errors.
+            # checkout -- restores tracked files (e.g. gastate_jobs.csv) to the
+            # just-committed state; clean -fd removes all untracked generated
+            # CSVs/JSONs that the scrapers wrote but we didn't commit.
+            git checkout -- scrapers/ 2>/dev/null || true
+            git clean -fd scrapers/ 2>/dev/null || true
+            # Merge instead of rebase: merge never needs to move HEAD to an
+            # old commit, so it can never trigger "untracked file would be
+            # overwritten by checkout".  -X ours keeps our scraped data on
+            # any text conflict with origin/main.
             git merge -X ours origin/main --no-edit
             git push
           fi

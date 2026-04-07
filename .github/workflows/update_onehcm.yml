@@ -51,8 +51,9 @@ jobs:
             COUNT=$(python3 -c "import csv; print(sum(1 for _ in csv.DictReader(open('scrapers/onehcm_jobs.csv'))))" 2>/dev/null || echo "?")
             git commit -m "Update OneHCM jobs data: ${COUNT} listings [skip ci]"
             git fetch origin main
-            rm -f scrapers/gastate_jobs.csv scrapers/gastate_jobs.json
-            rm -f scrapers/usg_all_jobs.csv scrapers/usg_all_jobs.json
+            # Clean working tree before merging — same pattern as update_jobs.yml
+            git checkout -- scrapers/ 2>/dev/null || true
+            git clean -fd scrapers/ 2>/dev/null || true
             git merge -X ours origin/main --no-edit
             git push
           fi
