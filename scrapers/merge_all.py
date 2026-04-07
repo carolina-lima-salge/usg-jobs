@@ -267,6 +267,66 @@ def merge_all(summary_only: bool = False) -> list[dict]:
         counts[key] = added
         print(f"  {path.name}: {added} rows loaded")
 
+    # ── Faculty fallback ──────────────────────────────────────────────────────
+    # The GA State faculty scraper (Interfolio/facultycareers.gsu.edu) can fail
+    # when the API is temporarily unreachable.  If today's scrape produced zero
+    # GA State faculty jobs, pull the last known set from the deployed jobs.json
+    # so they don't disappear from the site until the API recovers.
+    faculty_this_run = [
+        j for j in all_jobs
+        if "facultycareers.gsu.edu" in j.get("posting_url", "")
+    ]
+    if not faculty_this_run:
+        deployed_jobs_path = HERE.parent / "jobs.json"
+        if deployed_jobs_path.exists():
+            try:
+                prev = json.load(open(deployed_jobs_path, encoding="utf-8"))
+                prev_faculty = [
+                    j for j in prev.get("jobs", [])
+                    if "facultycareers.gsu.edu" in (j.get("view") or j.get("apply") or "")
+                ]
+                if prev_faculty:
+                    print(
+                        f"  [faculty fallback] GA State faculty API returned 0 jobs — "
+                        f"carrying forward {len(prev_faculty)} faculty jobs from last "
+                        f"deployed jobs.json so they stay visible until the API recovers."
+                    )
+                    # Convert from the compact jobs.json format back to master schema
+                    for pj in prev_faculty:
+                        url = pj.get("view") or pj.get("apply") or ""
+                        if url in seen_urls:
+                            continue
+                        if url:
+                            seen_urls.add(url)
+                        all_jobs.append({
+                            "job_id":                   pj.get("id", ""),
+                            "job_title":                pj.get("title", ""),
+                            "institution":              "Georgia State University",
+                            "department":               pj.get("department", ""),
+                            "location":                 pj.get("location", ""),
+                            "posted_date":              pj.get("posted", ""),
+                            "close_date":               pj.get("closes", ""),
+                            "full_part_time":           pj.get("type", ""),
+                            "regular_temporary":        "",
+                            "employment_type":          "",
+                            "salary":                   pj.get("salary", ""),
+                            "about_us":                 "",
+                            "job_summary":              pj.get("summary", ""),
+                            "responsibilities":         "",
+                            "required_qualifications":  "",
+                            "preferred_qualifications": "",
+                            "knowledge_skills":         "",
+                            "other_information":        "",
+                            "background_check":         "",
+                            "extra_sections":           "",
+                            "apply_link":               pj.get("apply", ""),
+                            "posting_url":              url,
+                            "source":                   "Georgia State University",
+                            "scraped_at":               "",
+                        })
+            except Exception as e:
+                print(f"  [faculty fallback] Could not load deployed jobs.json: {e}")
+
     # ── Summary ───────────────────────────────────────────────────────────────
     print()
     print("=" * 50)
