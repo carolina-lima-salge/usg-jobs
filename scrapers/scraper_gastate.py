@@ -1023,6 +1023,32 @@ _GSU_UNIT_NAMES = {
 }
 
 
+def _faculty_collect_ids_from_html(html: str, label: str, seen: set) -> list[dict]:
+    """
+    Ultra-reliable fallback: extract /postings/<id> IDs with regex.
+
+    Doesn't depend on CSS structure at all. Creates minimal cards with only
+    the job_id and URL. The detail-fetching step fills in all real data via
+    the confirmed-working /postings/<id>.json API.
+    """
+    ids = re.findall(r'/postings/(\d+)', html)
+    cards = []
+    for pid in dict.fromkeys(ids):   # preserve order, deduplicate
+        if pid in seen:
+            continue
+        seen.add(pid)
+        cards.append({
+            "job_id":      pid,
+            "url":         urljoin(FACULTY_BASE, f"/postings/{pid}"),
+            "title":       "",           # filled in by detail JSON fetch
+            "department":  "",
+            "location":    "Atlanta, Georgia",
+            "posted_date": "",
+            "section":     label,
+        })
+    return cards
+
+
 def _faculty_cards_look_valid(cards: list[dict]) -> bool:
     """
     Return True if the list of cards looks like real job listings.
@@ -1032,9 +1058,16 @@ def _faculty_cards_look_valid(cards: list[dict]) -> bool:
       • More than half the cards share the same title.
       • Any card title matches a known GSU college / unit name.
       • All card titles are very short (≤ 3 words) — navigation snippet.
+
+    Cards with empty titles (from ID-only extraction) are always treated
+    as valid — the detail-fetch step will populate their real titles.
     """
     if not cards:
         return False
+
+    # ID-only cards (empty titles) are valid by definition
+    if all(not card.get("title") for card in cards):
+        return True
 
     # Check for known unit names
     for card in cards:
@@ -1183,8 +1216,8 @@ def _faculty_collect_links_json(search_url: str, label: str) -> list[dict]:
         qs = ""
 
     candidate_bases = [
-        (f"{FACULTY_BASE}/postings.json?", "postings.json"),
-        (search_json_base, "search.json"),
+        (f"{FACULTY_BASE}/postings.json", "postings.json"),
+        (search_json_base.rstrip("?&"), "search.json"),
     ]
 
     for json_url_base, api_label in candidate_bases:
@@ -1194,7 +1227,8 @@ def _faculty_collect_links_json(search_url: str, label: str) -> list[dict]:
 
         print(f"    Trying {api_label} …", flush=True)
         while True:
-            url = f"{json_url_base}&page={page}&per_page={per}"
+            sep = "&" if "?" in json_url_base else "?"
+            url = f"{json_url_base}{sep}page={page}&per_page={per}"
             try:
                 r = session.get(url, timeout=30)
                 print(f"    {api_label} page {page}: HTTP {r.status_code}", flush=True)
@@ -1286,35 +1320,45 @@ def _faculty_has_next_page(soup: BeautifulSoup, current_page: int) -> bool:
 def _faculty_collect_links_requests(search_url: str, label: str) -> list[dict]:
     """
     Collect Interfolio faculty job posting links using requests + BeautifulSoup.
-    Paginates via `?page=N`.
+    Paginates via ?page=N.  Falls back to regex ID extraction if CSS parsing
+    finds nothing (the page may be JS-gated but IDs may still appear in markup).
     """
     links    = []
     seen     = set()
+    all_html = []
     session  = requests.Session()
     session.headers.update(HEADERS)
     page_num = 1
 
     while True:
         url = search_url if page_num == 1 else f"{search_url}&page={page_num}"
-        if DEBUG: print(f"    Fetching page {page_num}: {url}", flush=True)
         try:
             r = session.get(url, timeout=30)
             if r.status_code != 200:
-                print(f"  HTTP {r.status_code} on page {page_num} — stopping.", flush=True)
+                print(f"    requests HTTP {r.status_code} on page {page_num} — stopping.", flush=True)
                 break
         except Exception as e:
-            print(f"  Request error on page {page_num}: {e} — stopping.", flush=True)
+            print(f"    requests error on page {page_num}: {e} — stopping.", flush=True)
             break
 
+        all_html.append(r.text)
         soup  = BeautifulSoup(r.text, "lxml")
         cards = _faculty_parse_listing_page(r.text, label, seen)
         links.extend(cards)
-        print(f"    {label} page {page_num}: +{len(cards)}  total {len(links)}", flush=True)
+        print(f"    requests page {page_num}: CSS found {len(cards)} cards  total {len(links)}", flush=True)
 
         if not _faculty_has_next_page(soup, page_num) or not cards:
             break
         page_num += 1
         time.sleep(PAGE_DELAY)
+
+    # If CSS parsing found nothing, try ID extraction as fallback
+    if not links and all_html:
+        print("    CSS parsing found 0 cards — trying regex ID extraction …", flush=True)
+        id_seen: set = set()
+        for html in all_html:
+            links.extend(_faculty_collect_ids_from_html(html, label, id_seen))
+        print(f"    Regex extracted {len(links)} posting IDs from HTML", flush=True)
 
     return links
 
@@ -1322,27 +1366,31 @@ def _faculty_collect_links_requests(search_url: str, label: str) -> list[dict]:
 def _faculty_collect_links_playwright(page, search_url: str, label: str) -> list[dict]:
     """
     Playwright fallback for Interfolio listing collection.
-    Used when requests-based collection returns nothing (e.g. JS-rendered content).
+    Uses regex ID extraction instead of CSS selectors so it works regardless
+    of how the page renders — the detail JSON API fills in all real job data.
     """
-    print(f"  Using Playwright for {label} …", flush=True)
-    page.goto(search_url, wait_until="load", timeout=60_000)
-    page.wait_for_timeout(3000)
+    print(f"  Using Playwright for {label} (regex ID extraction) …", flush=True)
+    try:
+        page.goto(search_url, wait_until="networkidle", timeout=60_000)
+    except Exception:
+        page.goto(search_url, wait_until="load", timeout=60_000)
+    page.wait_for_timeout(5000)   # give JS time to inject listings
 
-    links    = []
     seen     = set()
+    links    = []
     page_num = 1
 
     while True:
         html  = page.content()
-        soup  = BeautifulSoup(html, "lxml")
-        cards = _faculty_parse_listing_page(html, label, seen)
+        cards = _faculty_collect_ids_from_html(html, label, seen)
         links.extend(cards)
-        print(f"    {label} page {page_num}: +{len(cards)}  total {len(links)}", flush=True)
+        print(f"    Playwright page {page_num}: +{len(cards)} IDs  total {len(links)}", flush=True)
 
-        if not _faculty_has_next_page(soup, page_num) or not cards:
+        # Try to go to next page
+        soup = BeautifulSoup(html, "lxml")
+        if not _faculty_has_next_page(soup, page_num):
             break
 
-        # Click Next
         next_clicked = False
         for nxt_sel in [
             "a[rel='next']",
@@ -1354,7 +1402,7 @@ def _faculty_collect_links_playwright(page, search_url: str, label: str) -> list
                 if loc.count() > 0 and loc.is_visible():
                     loc.click()
                     page.wait_for_load_state("load")
-                    page.wait_for_timeout(2000)
+                    page.wait_for_timeout(3000)
                     next_clicked = True
                     page_num += 1
                     break
