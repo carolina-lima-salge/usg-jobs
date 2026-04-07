@@ -91,28 +91,17 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Only commit the website-facing files.  Scraper intermediates
+          # (gastate_jobs.csv, uga_jobs.csv, etc.) are in .gitignore so git
+          # never tracks or merges them — permanently eliminating the
+          # "untracked file would be overwritten by checkout" error.
           git add jobs.json job_embeddings.bin job_embeddings_meta.json
-          # Use -A on the scrapers directory to reliably stage all generated
-          # files (new, modified, deleted) — glob expansion can silently fail
-          # in some shell environments.
-          git add -A scrapers/ 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No changes — skipping commit."
           else
             TOTAL=$(python3 -c "import json; d=json.load(open('jobs.json')); print(d['meta']['total'])")
             git commit -m "Auto-update jobs data: ${TOTAL} listings [skip ci]"
             git fetch origin main
-            # Fully clean the working tree before merging so git never sees
-            # "local changes would be overwritten" or "untracked file" errors.
-            # checkout -- restores tracked files (e.g. gastate_jobs.csv) to the
-            # just-committed state; clean -fd removes all untracked generated
-            # CSVs/JSONs that the scrapers wrote but we didn't commit.
-            git checkout -- scrapers/ 2>/dev/null || true
-            git clean -fd scrapers/ 2>/dev/null || true
-            # Merge instead of rebase: merge never needs to move HEAD to an
-            # old commit, so it can never trigger "untracked file would be
-            # overwritten by checkout".  -X ours keeps our scraped data on
-            # any text conflict with origin/main.
             git merge -X ours origin/main --no-edit
             git push
           fi

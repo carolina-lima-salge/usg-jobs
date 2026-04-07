@@ -1,0 +1,26 @@
+# ── Scraper intermediate outputs ────────────────────────────────────────────
+# These files are generated fresh on every workflow run and are NOT stored
+# in git.  Ignoring them prevents git merge/checkout from ever seeing them
+# as "untracked files that would be overwritten", which was the root cause
+# of the persistent push failures.
+#
+# NOTE: scrapers/onehcm_jobs.csv is intentionally NOT listed here — it is
+# committed by the OneHCM workflow so the main workflow can merge it in.
+
+scrapers/gastate_jobs.csv
+scrapers/gastate_jobs.json
+scrapers/uga_jobs.csv
+scrapers/uga_jobs.json
+scrapers/gatech_jobs.csv
+scrapers/gatech_jobs.json
+scrapers/gatech_listings.csv
+scrapers/gatech_listings.json
+scrapers/usg_all_jobs.csv
+scrapers/usg_all_jobs.json
+scrapers/jobs.json
+
+# Python / runtime artefacts
+__pycache__/
+*.py[cod]
+*.pyo
+.env
