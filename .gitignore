@@ -1,20 +1,13 @@
 # ── Scraper intermediate outputs ────────────────────────────────────────────
-# These files are generated fresh on every workflow run and are NOT stored
-# in git.  Ignoring them prevents git merge/checkout from ever seeing them
-# as "untracked files that would be overwritten", which was the root cause
-# of the persistent push failures.
+# The three individual scraper CSVs (uga_jobs.csv, gatech_jobs.csv,
+# gastate_jobs.csv) are intentionally NOT listed here — they are each
+# committed by their own dedicated workflow so the merge workflow can read them.
 #
-# NOTE: scrapers/onehcm_jobs.csv is intentionally NOT listed here — it is
-# committed by the OneHCM workflow so the main workflow can merge it in.
+# NOTE: scrapers/onehcm_jobs.csv is also NOT listed — committed by update_onehcm.yml
+#
+# Only the merged/intermediate files that are regenerated fresh on every merge
+# run and never need to be stored in git are ignored below.
 
-scrapers/gastate_jobs.csv
-scrapers/gastate_jobs.json
-scrapers/uga_jobs.csv
-scrapers/uga_jobs.json
-scrapers/gatech_jobs.csv
-scrapers/gatech_jobs.json
-scrapers/gatech_listings.csv
-scrapers/gatech_listings.json
 scrapers/usg_all_jobs.csv
 scrapers/usg_all_jobs.json
 scrapers/jobs.json
