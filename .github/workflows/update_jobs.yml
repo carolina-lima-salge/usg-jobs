@@ -1,7 +1,7 @@
-name: Daily Job Update (UGA + GA Tech + GA State + Merge)
+name: Merge & Deploy Jobs (UGA + GA Tech + GA State + OneHCM)
 
 on:
-  # Run every day at 11 AM ET (4 PM UTC) — 5 hours after OneHCM scraper starts
+  # Run every day at 11 AM ET (4 PM UTC) — after all individual scrapers have finished
   schedule:
     - cron: '0 16 * * *'
 
@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  update-jobs:
+  merge-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # fast scrapers + merge should finish well within an hour
+    timeout-minutes: 30
     permissions:
       contents: write   # needed to commit and push
 
@@ -26,29 +26,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install scraper dependencies
+      - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install requests beautifulsoup4 lxml playwright
-
-      - name: Install Playwright Chromium (for Georgia Tech scraper)
-        run: python -m playwright install chromium --with-deps
-        continue-on-error: true   # scraper falls back to requests if this fails
-
-      - name: Run UGA scraper
-        working-directory: scrapers
-        run: python scraper.py
-        continue-on-error: true
-
-      - name: Run Georgia Tech scraper
-        working-directory: scrapers
-        run: python scraper_gatech.py
-        continue-on-error: true
-
-      - name: Run Georgia State scraper
-        working-directory: scrapers
-        run: python scraper_gastate.py
-        continue-on-error: true
+          pip install requests beautifulsoup4 lxml
 
       - name: Merge all scrapers into usg_all_jobs.csv
         working-directory: scrapers
@@ -91,10 +72,6 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Only commit the website-facing files.  Scraper intermediates
-          # (gastate_jobs.csv, uga_jobs.csv, etc.) are in .gitignore so git
-          # never tracks or merges them — permanently eliminating the
-          # "untracked file would be overwritten by checkout" error.
           git add jobs.json job_embeddings.bin job_embeddings_meta.json
           if git diff --cached --quiet; then
             echo "No changes — skipping commit."
