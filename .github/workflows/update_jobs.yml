@@ -105,10 +105,10 @@ jobs:
             # errors during the rebase checkout dance. Merge -X ours keeps our
             # freshly-scraped data files when there are conflicts.
             git fetch origin main
-            # Reset working tree to exactly what was just committed so no
-            # modified/untracked files can block the merge.
-            git checkout -- .
-            git clean -fd
+            # Remove any scraper-generated files that are not in the commit
+            # so they can never block the merge with "untracked file" errors.
+            rm -f scrapers/gastate_jobs.csv scrapers/gastate_jobs.json
+            rm -f scrapers/usg_all_jobs.csv scrapers/usg_all_jobs.json
             git merge -X ours origin/main --no-edit
             git push
           fi
