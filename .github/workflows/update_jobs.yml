@@ -105,7 +105,10 @@ jobs:
             # errors during the rebase checkout dance. Merge -X ours keeps our
             # freshly-scraped data files when there are conflicts.
             git fetch origin main
+            # Clean any leftover untracked/modified files that would block the merge
+            git stash --include-untracked 2>/dev/null || true
             git merge -X ours origin/main --no-edit
+            git stash drop 2>/dev/null || true
             git push
           fi
 
