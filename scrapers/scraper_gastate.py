@@ -1448,7 +1448,10 @@ def _faculty_parse_detail(html: str, card: dict) -> dict:
             if t:
                 job["job_title"] = t
                 break
-    if not job["job_title"]:
+    # If the detail page returned a college/unit name as the title (e.g. the
+    # page's first h1 is a breadcrumb like "Perimeter College"), discard it and
+    # fall back to the correct title already scraped from the listing card.
+    if not job["job_title"] or job["job_title"].strip().lower() in _GSU_UNIT_NAMES:
         job["job_title"] = card.get("title", "")
 
     # ── Metadata: dl/dt/dd pairs ───────────────────────────────────────────────
