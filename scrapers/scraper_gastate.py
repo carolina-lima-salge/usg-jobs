@@ -1732,9 +1732,16 @@ def scrape_faculty(page, portal_urls: list[tuple[str,str]]) -> list[dict]:
 
         print(f"  [{i}/{len(all_cards)}] {card['title'][:55]} …", end=" ", flush=True)
         job = _faculty_fetch_detail(page, card)
-        # Final guard: skip if the resolved title is still a unit/college name
-        if job.get("job_title", "").strip().lower() in _GSU_UNIT_NAMES:
-            print(f"SKIP (unit name title)", flush=True)
+        # The listing card title (from the search-results page) is ALWAYS the
+        # most reliable source — the detail page repeatedly returns college/unit
+        # names (e.g. "Perimeter College") in its title fields.  Override
+        # unconditionally whenever the card has a valid, non-unit title.
+        card_title = card.get("title", "").strip()
+        if card_title and card_title.lower() not in _GSU_UNIT_NAMES:
+            job["job_title"] = card_title
+        # Only skip if we genuinely have no usable title at all
+        if not job.get("job_title") or job.get("job_title", "").strip().lower() in _GSU_UNIT_NAMES:
+            print(f"SKIP — no valid title", flush=True)
             continue
         jobs.append(job)
         print("✓", flush=True)
