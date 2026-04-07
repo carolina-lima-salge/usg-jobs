@@ -92,7 +92,10 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add jobs.json job_embeddings.bin job_embeddings_meta.json
-          git add scrapers/*.csv scrapers/*.json 2>/dev/null || true
+          # Use -A on the scrapers directory to reliably stage all generated
+          # files (new, modified, deleted) — glob expansion can silently fail
+          # in some shell environments.
+          git add -A scrapers/ 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No changes — skipping commit."
           else
