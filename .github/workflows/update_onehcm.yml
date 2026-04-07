@@ -38,6 +38,7 @@ jobs:
         working-directory: scrapers
         run: python scraper_onehcm.py
         timeout-minutes: 300  # 5 hours for 23 institutions + detail fetching
+        continue-on-error: true   # timeout or site errors should not block the commit step
 
       - name: Commit onehcm_jobs.csv
         run: |
@@ -49,6 +50,9 @@ jobs:
           else
             COUNT=$(python3 -c "import csv; print(sum(1 for _ in csv.DictReader(open('scrapers/onehcm_jobs.csv'))))" 2>/dev/null || echo "?")
             git commit -m "Update OneHCM jobs data: ${COUNT} listings [skip ci]"
-            git pull --rebase
+            git fetch origin main
+            rm -f scrapers/gastate_jobs.csv scrapers/gastate_jobs.json
+            rm -f scrapers/usg_all_jobs.csv scrapers/usg_all_jobs.json
+            git merge -X ours origin/main --no-edit
             git push
           fi
