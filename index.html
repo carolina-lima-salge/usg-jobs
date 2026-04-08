@@ -755,18 +755,20 @@
           </div>
         </div>
 
-        <!-- Posted within -->
+        <!-- Posted range -->
         <select id="f-posted" class="filter-select">
-          <option value="">Posted</option>
+          <option value="">Posted range</option>
           <option value="7">Last 7 days</option>
           <option value="30">Last 30 days</option>
           <option value="90">Last 90 days</option>
         </select>
 
-        <!-- Date sort -->
+        <!-- Posted date sort -->
         <select id="f-sort" class="filter-select">
+          <option value="">Posted date</option>
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
+          <option value="__none__">Not Reported</option>
         </select>
 
         <!-- Salary sort -->
@@ -1319,7 +1321,7 @@ function resetAllFilters() {
   const typeEl = document.getElementById('f-type');
   if (typeEl) typeEl.value = '';
   const sortEl = document.getElementById('f-sort');
-  if (sortEl) sortEl.value = 'newest';
+  if (sortEl) sortEl.value = '';
   // Clear multi-selects
   selectedInsts.clear();
   selectedLocs.clear();
@@ -1349,7 +1351,7 @@ function applyFilters() {
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || category || salarySort || (sort && sort !== 'newest');
+  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || category || salarySort || sort;
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
@@ -1367,17 +1369,21 @@ function applyFilters() {
     if (employment) {
       const em = (job.employment || '').toLowerCase();
       if (employment === '__none__') {
-        if (em) return false;                      // has data → exclude
+        if (em) return false;
       } else {
-        if (!em || !em.includes(employment)) return false; // wrong or missing → exclude
+        if (!em || !em.includes(employment)) return false;
       }
+    }
+
+    // Posted date: __none__ shows only undated jobs; cutoff filters by range
+    if (sort === '__none__') {
+      if (job.posted) return false;
     }
 
     if (selectedLocs.size > 0 && !selectedLocs.has(job.location)) return false;
 
     if (cutoff) {
       const d = parseDate(job.posted);
-      // Only filter by date if the job has a date — undated jobs always pass
       if (d && d < cutoff) return false;
     }
 
@@ -1421,8 +1427,9 @@ function applyFilters() {
   const arrow = document.getElementById('col-sort-arrow');
   const colEl = document.getElementById('col-sort-posted');
   if (arrow && colEl) {
-    colEl.classList.toggle('sort-active', !salarySort);
-    arrow.textContent = sort === 'oldest' ? '↑' : '↓';
+    const dateActive = !salarySort && sort !== '__none__';
+    colEl.classList.toggle('sort-active', dateActive);
+    arrow.textContent = sort === 'oldest' ? '↑' : sort === '__none__' ? '↕' : '↓';
   }
 
   // All users (including anonymous) see the full job list
@@ -1431,10 +1438,10 @@ function applyFilters() {
   render();
 }
 
-// Toggle the Posted column between newest → oldest → newest
+// Toggle the Posted column between newest → oldest → "" (reset)
 function togglePostedSort() {
   const sel = document.getElementById('f-sort');
-  sel.value = sel.value === 'newest' ? 'oldest' : 'newest';
+  sel.value = sel.value === '' ? 'newest' : sel.value === 'newest' ? 'oldest' : '';
   currentPage = 1;
   applyFilters();
 }
@@ -1906,7 +1913,7 @@ function saveStateToHash() {
   if (q) params.set('q', q);
   ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary'].forEach(id => {
     const v = document.getElementById(id).value;
-    const def = id === 'f-sort' ? 'newest' : '';
+    const def = '';
     if (v && v !== def) params.set(id.replace('f-',''), v);
   });
   if (selectedInsts.size) params.set('inst', [...selectedInsts].join('|'));
@@ -1937,7 +1944,7 @@ document.getElementById('search').addEventListener('input', onSearchInput);
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
   ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary','f-category'].forEach(id => {
-    document.getElementById(id).value = id === 'f-sort' ? 'newest' : '';
+    document.getElementById(id).value = '';
   });
 
   // Clear multi-selects
