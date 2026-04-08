@@ -135,6 +135,24 @@
     .match-med  { background: #fefce8; color: #854d0e; }
     .match-low  { background: #f9fafb; color: var(--text-2); border: 1px solid var(--border); }
 
+    /* ── Match badge tooltip ── */
+    .match-wrap {
+      position: relative; display: inline-block;
+    }
+    .match-wrap .match-tip {
+      display: none;
+      position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: #f1f5f9; font-size: 0.74rem; font-weight: 400;
+      line-height: 1.45; padding: 7px 11px; border-radius: 6px;
+      white-space: normal; width: 230px; text-align: left;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.22); z-index: 999; pointer-events: none;
+    }
+    .match-wrap .match-tip::after {
+      content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+      border: 6px solid transparent; border-top-color: #1e293b;
+    }
+    .match-wrap:hover .match-tip { display: block; }
+
     /* ── Pagination ── */
     .page-btn {
       min-width: 32px; height: 32px; display: flex; align-items: center;
@@ -1904,8 +1922,9 @@ function matchBadge(score, reason) {
   const cls   = pct >= 60 ? 'match-high' : pct >= 30 ? 'match-med' : 'match-low';
   const star  = pct >= 60 ? '⭐ ' : '';
   const label = `${star}${pct}% match`;
-  const tip   = reason ? ` title="${reason.replace(/"/g, '&quot;')}"` : '';
-  return `<span class="badge ${cls}"${tip} style="${reason ? 'cursor:help' : ''}">${label}</span>`;
+  if (!reason) return `<span class="badge ${cls}">${label}</span>`;
+  const safeReason = reason.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<span class="match-wrap"><span class="badge ${cls}" style="cursor:help">${label}</span><span class="match-tip"><strong>${pct}% match</strong><br>${safeReason}</span></span>`;
 }
 
 // ── File parsing ────────────────────────────────────────────────────────────────
