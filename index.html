@@ -1606,34 +1606,16 @@ function renderStarPrepBtn(job) {
 async function _runStarGeneration(job, cvText, content) {
   content.innerHTML = '<p style="text-align:center;color:var(--text-3);padding:30px 0;font-size:0.85rem;">✨ Generating STAR talking points for this role…</p>';
   try {
-    // Build prompt client-side and call the Cloudflare Worker directly
-    // (same proxy already used for CV matching & coach — no separate deployment needed)
-    const prompt = `You are a career coach. Generate exactly 3 STAR interview talking points for this role.
-
-Role: ${job.title || ''} at ${job.institution || ''}
-Job description: ${(job.summary || '').substring(0, 1000)}
-Candidate CV excerpt: ${cvText.substring(0, 2000)}
-
-Connect real experiences from the CV to the job requirements.
-Reply ONLY with this JSON (no markdown, no commentary):
-{"points":[{"situation":"","task":"","action":"","result":""},{"situation":"","task":"","action":"","result":""},{"situation":"","task":"","action":"","result":""}]}`;
-
-    const workerUrl = 'https://usg-jobs-proxy.csalge611.workers.dev';
-    const resp = await fetch(workerUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
+    const { data, error } = await _sb.functions.invoke('star-prep', {
+      body: {
+        jobTitle:    job.title      || '',
+        institution: job.institution || '',
+        jobSummary:  job.summary    || '',
+        cvText:      cvText
+      }
     });
-    if (!resp.ok) throw new Error(`Worker error ${resp.status}: ${await resp.text().catch(()=>'')}`);
-    const workerData = await resp.json();
-    const raw = (workerData?.content?.[0]?.text || '').trim()
-      .replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/```\s*$/i,'').trim();
-    const parsed = JSON.parse(raw);
-    const points = parsed?.points || [];
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    const points = data?.points || [];
     content.innerHTML = points.length
       ? points.map((p, i) => `
           <div style="margin-bottom:14px;padding:12px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg);">
