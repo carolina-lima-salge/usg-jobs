@@ -768,6 +768,7 @@
           <option value="">Posted Date</option>
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
+          <option value="__none__">Not Reported</option>
         </select>
 
         <!-- Salary sort -->
@@ -1376,6 +1377,11 @@ function applyFilters() {
 
     if (selectedLocs.size > 0 && !selectedLocs.has(job.location)) return false;
 
+    // Not Reported: show only jobs with no posted date
+    if (sort === '__none__') {
+      if (job.posted) return false;
+    }
+
     if (cutoff) {
       const d = parseDate(job.posted);
       if (d && d < cutoff) return false;
@@ -1425,8 +1431,9 @@ function applyFilters() {
   const arrow = document.getElementById('col-sort-arrow');
   const colEl = document.getElementById('col-sort-posted');
   if (arrow && colEl) {
-    colEl.classList.toggle('sort-active', !salarySort);
-    arrow.textContent = sort === 'oldest' ? '↑' : '↓';
+    const dateActive = !salarySort && sort !== '__none__';
+    colEl.classList.toggle('sort-active', dateActive);
+    arrow.textContent = sort === 'oldest' ? '↑' : sort === '__none__' ? '↕' : '↓';
   }
 
   // All users (including anonymous) see the full job list
