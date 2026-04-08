@@ -2765,10 +2765,10 @@ function updateHeaderUI() {
     const initial = (name || currentUser.email || '?')[0].toUpperCase();
     avatar.textContent = initial;
     label.textContent  = name || currentUser.email.split('@')[0];
-    // Show upgrade button for free + basic users; hide only for Pro
+    // Show upgrade button for free users; hide for Pro (basic treated as pro via getUserTier)
     const subBtn = document.getElementById('umenu-subscribe');
     const analyticsBtn = document.getElementById('umenu-analytics');
-    const isPro = userProfile?.subscription_status === 'active' && userProfile?.subscription_tier === 'pro';
+    const isPro = getUserTier() === 'pro';
     if (subBtn) subBtn.style.display = isPro ? 'none' : '';
     if (analyticsBtn) analyticsBtn.style.display = isPro ? '' : 'none';
     const plansBtn = document.getElementById('btn-view-plans');
@@ -3062,10 +3062,10 @@ async function loadProfile() {
   userProfile = data;
   // Refresh header label now that we have the full name
   updateHeaderUI();
-  // Show "Upgrade" for free users; basic users can upgrade to Pro; only Pro stays hidden
+  // Show "Upgrade" for free users; hide for Pro (getUserTier maps 'basic' → 'pro')
   const subBtn = document.getElementById('umenu-subscribe');
   const analyticsBtn = document.getElementById('umenu-analytics');
-  const isPro = data?.subscription_status === 'active' && data?.subscription_tier === 'pro';
+  const isPro = getUserTier() === 'pro';
   if (subBtn) subBtn.style.display = isPro ? 'none' : '';
   if (analyticsBtn) analyticsBtn.style.display = isPro ? '' : 'none';
   const plansBtn = document.getElementById('btn-view-plans');
