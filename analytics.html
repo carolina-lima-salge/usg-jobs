@@ -257,11 +257,18 @@ const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ── Auth gate ─────────────────────────────────────────────────────────────────
 async function checkAccess() {
   const { data: { session } } = await _sb.auth.getSession();
-  if (!session) return false;
-  const { data: profile } = await _sb.from('profiles').select('subscription_status,subscription_tier').eq('id', session.user.id).maybeSingle();
-  const tier = profile?.subscription_tier || '';
+  if (!session) { console.warn('[USG analytics] No session found'); return false; }
+  console.log('[USG analytics] User ID:', session.user.id, '| Email:', session.user.email);
+  const { data: profile, error } = await _sb.from('profiles')
+    .select('subscription_status,subscription_tier')
+    .eq('id', session.user.id)
+    .maybeSingle();
+  console.log('[USG analytics] Profile fetch:', { profile, error });
+  const tier   = profile?.subscription_tier   || '';
   const status = profile?.subscription_status || '';
-  return status === 'active' && (tier === 'pro' || tier === 'basic');
+  const access = status === 'active' && (tier === 'pro' || tier === 'basic');
+  console.log('[USG analytics] Access granted:', access, '| status:', status, '| tier:', tier);
+  return access;
 }
 
 // ── Colour palette (single blue family — Knaflic: use colour intentionally) ──

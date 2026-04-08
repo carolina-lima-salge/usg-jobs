@@ -3062,13 +3062,20 @@ async function loadProfile() {
   if (!currentUser) return;
   // Race the Supabase fetch against a 10-second timeout so a hanging
   // network call doesn't keep the user in 'pending' tier forever.
-  let data = null;
+  let data = null, fetchError = null;
   try {
-    ({ data } = await sbQuery(
+    ({ data, error: fetchError } = await sbQuery(
       _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(),
       10000, null
     ));
-  } catch(e) { console.warn('Profile fetch error:', e); }
+  } catch(e) { console.warn('Profile fetch error:', e); fetchError = e; }
+  // Diagnostic log — open browser console (F12) to see what Supabase returned
+  console.log('[USG] loadProfile result:', { data, fetchError, userId: currentUser?.id });
+  if (data) {
+    console.log('[USG] subscription_status:', data.subscription_status, '| subscription_tier:', data.subscription_tier);
+  } else {
+    console.warn('[USG] Profile row is null — RLS may be blocking the read, or no row exists for this user.');
+  }
   userProfile = data;
   // Refresh header label now that we have the full name (also updates subscribe button visibility)
   updateHeaderUI();
