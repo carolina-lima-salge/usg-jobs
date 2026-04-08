@@ -1355,7 +1355,9 @@ function applyFilters() {
 
     if (employment) {
       const em = (job.employment || '').toLowerCase();
-      if (!em.includes(employment)) return false;
+      // Only exclude if the job explicitly has a *different* employment type.
+      // Jobs with no employment data (e.g. UGA, GSU) are not excluded.
+      if (em && !em.includes(employment)) return false;
     }
 
     if (selectedLocs.size > 0 && !selectedLocs.has(job.location)) return false;
