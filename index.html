@@ -341,12 +341,8 @@
     }
     .tier-feature.muted { color: var(--text-3); }
 
-    /* ── Free tier upgrade banner ── */
-    #free-tier-banner {
-      background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px;
-      padding: 11px 16px; margin-bottom: 14px;
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    }
+    /* ── Free tier upgrade banner (removed) ── */
+    #free-tier-banner { display: none !important; }
 
     /* ── Auth modal ── */
     #auth-overlay {
@@ -714,8 +710,8 @@
 
       <!-- CV Match button -->
       <button id="btn-cv-toggle" type="button"
-        style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:600;padding:0 12px;height:30px;border-radius:var(--radius);border:1px solid var(--border);color:var(--text-1);background:var(--surface);cursor:pointer;white-space:nowrap;font-family:inherit;transition:all 0.12s;">
-        Match my CV
+        style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:600;padding:0 12px;height:30px;border-radius:var(--radius);border:none;color:#fff;background:var(--accent);cursor:pointer;white-space:nowrap;font-family:inherit;transition:all 0.12s;">
+        Match my CV/Resume
       </button>
 
       <!-- Separator -->
@@ -2101,10 +2097,10 @@ function clearCVMatch() {
   document.getElementById('cv-error').classList.add('hidden');
   document.getElementById('cv-file-input').value = '';
   const btn = document.getElementById('btn-cv-toggle');
-  btn.textContent = 'Match my CV';
-  btn.style.background = 'var(--surface)';
-  btn.style.color = 'var(--text-1)';
-  btn.style.borderColor = 'var(--border)';
+  btn.textContent = 'Match my CV/Resume';
+  btn.style.background = 'var(--accent)';
+  btn.style.color = '#fff';
+  btn.style.borderColor = 'transparent';
   btn.style.fontWeight = '600';
   applyFilters();
 }
@@ -2156,13 +2152,13 @@ loadData();
     <path stroke-linecap="round" stroke-linejoin="round"
       d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
   </svg>
-  CV Coach
+  CV/Resume Coach
 </button>
 
 <div id="coach-panel">
   <div id="coach-header" onclick="minimizeCoach()" style="cursor:pointer;">
     <div>
-      <div style="font-size:0.88rem;font-weight:600;">CV Coach</div>
+      <div style="font-size:0.88rem;font-weight:600;">CV/Resume Coach</div>
       <div id="coach-header-sub" style="font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:2px;">Powered by Claude AI</div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;">
@@ -2277,7 +2273,7 @@ async function initCoach() {
 
   // No CV uploaded yet — just greet and prompt
   if (!cvTextGlobal) {
-    coachAddBubble('Hi! Upload your CV using the "Match my CV" button above and I\'ll analyse it against the job listings to give you personalised tips to strengthen your application.', 'claude', false);
+    coachAddBubble('Hi! Upload your CV/Resume using the "Match my CV/Resume" button above and I\'ll analyse it against the job listings to give you personalised tips to strengthen your application.', 'claude', false);
     document.getElementById('coach-send').disabled = false;
     return;
   }
