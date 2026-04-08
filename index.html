@@ -1412,7 +1412,11 @@ function applyFilters() {
       return diff !== 0 ? diff : dateOf(b) - dateOf(a); // tie-break by date
     });
   } else if (sort === 'oldest') {
+    filtered = filtered.filter(j => j.posted);
     filtered.sort((a, b) => dateOf(a) - dateOf(b));
+  } else if (sort === 'newest') {
+    filtered = filtered.filter(j => j.posted);
+    filtered.sort((a, b) => dateOf(b) - dateOf(a));
   } else {
     filtered.sort((a, b) => dateOf(b) - dateOf(a));
   }
