@@ -1845,10 +1845,13 @@ async function runSemanticMatching(cvText) {
 
   cvScores = {};
   allJobs.forEach(job => {
-    const abs     = Math.max(0, Math.min(1, (raw[job.id] - LOW) / (HIGH - LOW)));
-    const boost   = titleBoost(job);
-    const penalty = seniorityPenalty(cvLevel, detectJobLevel(job));
-    cvScores[job.id] = Math.min(1, abs + boost) * penalty;
+    const abs      = Math.max(0, Math.min(1, (raw[job.id] - LOW) / (HIGH - LOW)));
+    const boost    = titleBoost(job);
+    const penalty  = seniorityPenalty(cvLevel, detectJobLevel(job));
+    const base     = Math.min(1, abs + boost) * penalty;
+    const titleWords = tokenize(job.title || '').filter(w => w.length > 3);
+    const hitRatio = titleWords.length ? titleWords.filter(w => cvLower.includes(w)).length / titleWords.length : 0;
+    cvScores[job.id] = hitRatio >= 0.75 ? Math.max(base, 0.85) : hitRatio >= 0.5 ? Math.max(base, 0.65) : base;
   });
 
   matchMode   = true;
@@ -1916,13 +1919,13 @@ function runTFIDFMatching(cvText) {
   const cvLower2 = cvText.toLowerCase();
   cvScores = {};
   allJobs.forEach(job => {
-    const rel     = raw[job.id] / maxS;
+    const rel        = raw[job.id] / maxS;
     const titleWords = tokenize(job.title || '').filter(w => w.length > 3);
-    const boost = titleWords.length
-      ? (titleWords.filter(w => cvLower2.includes(w)).length / titleWords.length) * 0.20
-      : 0;
-    const penalty = seniorityPenalty(cvLevel, detectJobLevel(job));
-    cvScores[job.id] = Math.min(1, rel + boost) * penalty;
+    const hitRatio   = titleWords.length ? titleWords.filter(w => cvLower2.includes(w)).length / titleWords.length : 0;
+    const boost      = hitRatio * 0.20;
+    const penalty    = seniorityPenalty(cvLevel, detectJobLevel(job));
+    const base       = Math.min(1, rel + boost) * penalty;
+    cvScores[job.id] = hitRatio >= 0.75 ? Math.max(base, 0.85) : hitRatio >= 0.5 ? Math.max(base, 0.65) : base;
   });
   matchMode = true; currentPage = 1; applyFilters();
 }
@@ -2064,6 +2067,24 @@ ${jobsList}`;
     const id = String(r.id);
     if (r.score != null) cvScores[id] = Math.max(0, Math.min(100, r.score)) / 100;
     if (r.reason)        cvReasons[id] = r.reason;
+  });
+
+  // Step 6 — title-match floor: if the job title words are strongly present in
+  // the CV, the candidate clearly belongs in that role — enforce a minimum score.
+  // "Assistant Professor in MIS" on your CV should never score below 85% for the same job.
+  const cvLower = cvText.toLowerCase();
+  allJobs.forEach(job => {
+    const titleWords = tokenize(job.title || '').filter(w => w.length > 3);
+    if (!titleWords.length) return;
+    const hitRatio = titleWords.filter(w => cvLower.includes(w)).length / titleWords.length;
+    if (hitRatio >= 0.75) {
+      // Strong title match — ensure at least 85%
+      cvScores[job.id] = Math.max(cvScores[job.id] || 0, 0.85);
+      if (!cvReasons[job.id]) cvReasons[job.id] = 'Your current role closely matches this job title and field.';
+    } else if (hitRatio >= 0.5) {
+      // Partial title match — ensure at least 65%
+      cvScores[job.id] = Math.max(cvScores[job.id] || 0, 0.65);
+    }
   });
 
   matchMode   = true;
