@@ -1602,20 +1602,40 @@ function renderStarPrepBtn(job) {
   return `<button style="${btnStar}" onclick="openStarPrep('${esc(job.id)}',event)" title="Generate STAR interview talking points">✨ STAR Prep</button>`;
 }
 
-// Render STAR points from edge function into the modal content div
+// Render STAR points via the Cloudflare Worker (same proxy used for CV matching)
 async function _runStarGeneration(job, cvText, content) {
   content.innerHTML = '<p style="text-align:center;color:var(--text-3);padding:30px 0;font-size:0.85rem;">✨ Generating STAR talking points for this role…</p>';
   try {
-    const { data, error } = await _sb.functions.invoke('star-prep', {
-      body: {
-        jobTitle:    job.title    || '',
-        institution: job.institution || '',
-        jobSummary:  job.summary  || '',
-        cvText:      cvText.substring(0, 4000),
-      }
+    const prompt = `You are a career coach helping a job applicant prepare STAR interview talking points.
+
+Job: ${job.title || ''} at ${job.institution || ''}
+Job Summary: ${(job.summary || '').substring(0, 1200)}
+
+Applicant CV (excerpt): ${cvText.substring(0, 2500)}
+
+Generate exactly 3 STAR talking points tailored to this specific role and the applicant's background. Each point should connect a real experience from the CV to a requirement of the job.
+
+Respond ONLY with valid JSON — no markdown, no extra text:
+{"points":[{"situation":"...","task":"...","action":"...","result":"..."}]}`;
+
+    const resp = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1200,
+        messages: [{ role: 'user', content: prompt }]
+      })
     });
-    if (error) throw new Error(error.message || JSON.stringify(error));
-    const points = data?.points || [];
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.error?.message || `API error ${resp.status}`);
+    }
+    const apiData = await resp.json();
+    const raw = (apiData.content?.[0]?.text || '').trim()
+      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+    const parsed = JSON.parse(raw);
+    const points = parsed?.points || [];
     content.innerHTML = points.length
       ? points.map((p, i) => `
           <div style="margin-bottom:14px;padding:12px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg);">
@@ -1633,7 +1653,7 @@ async function _runStarGeneration(job, cvText, content) {
       <div style="padding:16px;background:#fef2f2;border-radius:6px;border:1px solid #fca5a5;">
         <p style="color:#991b1b;font-size:0.82rem;font-weight:600;">Could not generate talking points</p>
         <p style="color:#7f1d1d;font-size:0.78rem;margin-top:4px;">${esc(e?.message || String(e))}</p>
-        <p style="font-size:0.75rem;color:var(--text-3);margin-top:8px;">Make sure the Supabase Edge Function is deployed and ANTHROPIC_API_KEY is configured.</p>
+        <p style="font-size:0.75rem;color:var(--text-3);margin-top:8px;">Check your internet connection or try again in a moment.</p>
       </div>`;
   }
 }
