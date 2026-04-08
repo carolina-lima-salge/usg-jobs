@@ -164,10 +164,10 @@
     #filter-bar { border-bottom: 1px solid var(--border); background: var(--surface); }
     /* Two-row stacked layout — both rows share the same left/right edges */
     .filter-row { display: flex; flex-direction: column; gap: 5px; }
-    /* Row 1: search bar — fills full width */
-    .filter-primary { display: flex; align-items: center; }
-    .filter-primary > div { flex: 1; min-width: 0; }
-    /* Row 2: CV button + filter chips */
+    /* Row 1: search grows, CV button pinned right */
+    .filter-primary { display: flex; align-items: center; gap: 8px; }
+    .filter-primary > div:first-child { flex: 1; min-width: 0; }
+    /* Row 2: filter chips only */
     .filter-secondary { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
     select.filter-select {
       border: 1px solid var(--border); border-radius: var(--radius);
@@ -685,7 +685,7 @@
   <div style="max-width:1100px;margin:0 auto;padding:8px 20px;">
     <div class="filter-row">
       <!-- Row 1: Search + CV match button -->
-      <!-- Row 1: Search bar — full width -->
+      <!-- Row 1: Search bar + CV button (same row, same total width as row 2) -->
       <div class="filter-primary">
         <div style="position:relative;flex:1;min-width:0;">
           <svg style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-3);pointer-events:none;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -698,17 +698,14 @@
                  onblur="this.style.outline='none'" />
           <datalist id="search-suggestions"></datalist>
         </div>
-      </div>
-
-      <!-- Row 2: CV button + filter selects (horizontally scrollable on mobile) -->
-      <div class="filter-secondary">
-        <!-- CV/Resume match button — first in filter row so it aligns with other controls -->
         <button id="btn-cv-toggle"
-          style="font-size:0.78rem;padding:5px 12px;border-radius:var(--radius);border:none;cursor:pointer;white-space:nowrap;font-family:inherit;background:var(--accent);color:#fff;font-weight:500;flex-shrink:0;height:30px;">
+          style="font-size:0.78rem;padding:5px 14px;border-radius:var(--radius);border:none;cursor:pointer;white-space:nowrap;font-family:inherit;background:var(--accent);color:#fff;font-weight:500;flex-shrink:0;height:30px;">
           Match my CV/Resume
         </button>
-        <!-- Thin divider between CV button and filter chips -->
-        <div style="width:1px;height:18px;background:var(--border);flex-shrink:0;"></div>
+      </div>
+
+      <!-- Row 2: Filter chips — same container width as row 1 above -->
+      <div class="filter-secondary">
 
         <!-- Institution multi-select -->
         <div class="multiselect">
@@ -1605,36 +1602,16 @@ function renderStarPrepBtn(job) {
   return `<button style="${btnStar}" onclick="openStarPrep('${esc(job.id)}',event)" title="Generate STAR interview talking points">✨ STAR Prep</button>`;
 }
 
-async function openStarPrep(jobId, event) {
-  event.stopPropagation();
-  if (!currentUser) { openAuthModal('signin'); return; }
-  const tier = await resolvedTier();
-  if (tier !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
-
-  const job = allJobs.find(j => j.id === jobId) || {};
-  const modal = document.getElementById('star-modal');
-  modal.classList.remove('hidden');
-  document.getElementById('star-job-title').textContent = `${job.title || 'Job'} — ${job.institution || ''}`;
-  const content = document.getElementById('star-content');
-
-  if (!cvTextGlobal) {
-    content.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-2);">
-      <div style="font-size:2rem;margin-bottom:8px;">📄</div>
-      <p style="font-size:0.85rem;">Upload your CV/Resume first to get personalised STAR talking points.</p>
-      <p style="font-size:0.78rem;color:var(--text-3);margin-top:6px;">Click "Match my CV/Resume" in the filter bar, then come back here.</p>
-    </div>`;
-    return;
-  }
-
+// Render STAR points from edge function into the modal content div
+async function _runStarGeneration(job, cvText, content) {
   content.innerHTML = '<p style="text-align:center;color:var(--text-3);padding:30px 0;font-size:0.85rem;">✨ Generating STAR talking points for this role…</p>';
-
   try {
     const { data, error } = await _sb.functions.invoke('star-prep', {
       body: {
         jobTitle:    job.title    || '',
         institution: job.institution || '',
         jobSummary:  job.summary  || '',
-        cvText:      cvTextGlobal.substring(0, 4000),
+        cvText:      cvText.substring(0, 4000),
       }
     });
     if (error) throw new Error(error.message || JSON.stringify(error));
@@ -1659,6 +1636,76 @@ async function openStarPrep(jobId, event) {
         <p style="font-size:0.75rem;color:var(--text-3);margin-top:8px;">Make sure the Supabase Edge Function is deployed and ANTHROPIC_API_KEY is configured.</p>
       </div>`;
   }
+}
+
+async function openStarPrep(jobId, event) {
+  event.stopPropagation();
+  if (!currentUser) { openAuthModal('signin'); return; }
+  const tier = await resolvedTier();
+  if (tier !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
+
+  const job = allJobs.find(j => j.id === jobId) || {};
+  const modal = document.getElementById('star-modal');
+  modal.classList.remove('hidden');
+  document.getElementById('star-job-title').textContent = `${job.title || 'Job'} — ${job.institution || ''}`;
+  const content = document.getElementById('star-content');
+
+  // If CV already loaded — generate immediately
+  if (cvTextGlobal) {
+    await _runStarGeneration(job, cvTextGlobal, content);
+    return;
+  }
+
+  // No CV yet — show compact inline upload zone
+  content.innerHTML = `
+    <div style="padding:16px 0;">
+      <p style="font-size:0.84rem;color:var(--text-2);margin-bottom:14px;text-align:center;">
+        Upload your CV/Resume to get personalised STAR talking points for this role.
+      </p>
+      <label for="star-cv-input" id="star-dz"
+        style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+               border:2px dashed var(--border);border-radius:8px;padding:28px 20px;cursor:pointer;
+               background:var(--bg-2);transition:border-color .15s;"
+        onmouseover="this.style.borderColor='var(--accent)'"
+        onmouseout="this.style.borderColor='var(--border)'">
+        <svg style="width:32px;height:32px;color:var(--accent);opacity:.7;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <span style="font-size:0.82rem;font-weight:500;color:var(--text-1);">Click to upload your CV/Resume</span>
+        <span style="font-size:0.72rem;color:var(--text-3);">PDF, DOCX, or TXT — processed in your browser</span>
+      </label>
+      <input type="file" id="star-cv-input" accept=".pdf,.docx,.txt" style="display:none;">
+      <div id="star-cv-error" style="display:none;margin-top:8px;font-size:0.78rem;color:#991b1b;text-align:center;"></div>
+    </div>`;
+
+  document.getElementById('star-cv-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    content.innerHTML = '<p style="text-align:center;color:var(--text-3);padding:30px 0;font-size:0.85rem;">📄 Reading your CV…</p>';
+    try {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const ab  = await file.arrayBuffer();
+      let text  = '';
+      if (ext === 'pdf')       text = await extractPDFText(ab);
+      else if (ext === 'docx') text = await extractDOCXText(ab);
+      else                     text = new TextDecoder().decode(ab);
+      if (text.trim().length < 20) throw new Error('Could not read text from this file.');
+
+      // Set global CV and kick off background job matching so the filter bar also updates
+      cvTextGlobal = text;
+      try { localStorage.setItem('usg_cv_text', text); } catch(_) {}
+      // Run matching async in background — don't block STAR generation
+      if (embLoaded) runSemanticMatching(text).catch(() => runTFIDFMatching(text));
+      else           runTFIDFMatching(text);
+      setCVActiveButton();
+
+      // Now generate STAR points with the freshly parsed CV
+      await _runStarGeneration(job, text, content);
+    } catch (err) {
+      content.innerHTML = `<div style="padding:20px;text-align:center;color:#991b1b;font-size:0.82rem;">⚠ ${esc(err.message)}</div>`;
+    }
+  });
 }
 
 function renderSimilarJobs(job) {
