@@ -321,6 +321,10 @@
       padding:16px; overflow-y:auto;
     }
     #profile-overlay.hidden, #subscribe-overlay.hidden { display:none; }
+
+    /* ── STAR prep modal ── */
+    #star-modal { position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
+    #star-modal.hidden { display:none; }
     .modal-card {
       background:var(--surface); border-radius:8px; box-shadow:var(--shadow-md);
       width:100%; max-width:480px; padding:28px; margin:auto; position:relative; top:8vh;
@@ -771,6 +775,24 @@
           <option value="100000">$100K+</option>
         </select>
 
+        <!-- Category / archetype filter -->
+        <select id="f-category" class="filter-select">
+          <option value="">All Categories</option>
+          <option value="Faculty &amp; Research">Faculty &amp; Research</option>
+          <option value="IT &amp; Technology">IT &amp; Technology</option>
+          <option value="Administrative">Administrative</option>
+          <option value="Student Services">Student Services</option>
+          <option value="Healthcare">Healthcare</option>
+          <option value="Finance &amp; Accounting">Finance &amp; Accounting</option>
+          <option value="Facilities &amp; Trades">Facilities &amp; Trades</option>
+          <option value="Human Resources">Human Resources</option>
+          <option value="Communications &amp; Marketing">Communications &amp; Marketing</option>
+          <option value="Library &amp; Archives">Library &amp; Archives</option>
+          <option value="Athletics &amp; Recreation">Athletics &amp; Recreation</option>
+          <option value="Legal &amp; Compliance">Legal &amp; Compliance</option>
+          <option value="Safety &amp; Security">Safety &amp; Security</option>
+        </select>
+
         <!-- CV/Resume match button -->
         <button id="btn-cv-toggle"
           style="font-size:0.78rem;padding:5px 10px;border-radius:var(--radius);border:none;cursor:pointer;white-space:nowrap;font-family:inherit;background:var(--accent);color:#fff;font-weight:500;flex-shrink:0;height:30px;">
@@ -903,6 +925,23 @@
         <div class="kanban-col-header">❌ Rejected <span class="k-count" id="kcount-rejected">0</span></div>
         <div id="kcol-rejected"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── STAR Interview Prep Modal ────────────────────────────────────────── -->
+  <div id="star-modal" class="hidden"
+    onclick="if(event.target===this)this.classList.add('hidden')"
+    >
+    <div style="background:var(--surface);border-radius:8px;box-shadow:var(--shadow-md);width:100%;max-width:580px;max-height:82vh;display:flex;flex-direction:column;" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <div>
+          <div style="font-size:0.98rem;font-weight:700;">✨ STAR Interview Prep</div>
+          <div id="star-job-title" style="font-size:0.78rem;color:var(--text-2);margin-top:2px;"></div>
+        </div>
+        <button onclick="document.getElementById('star-modal').classList.add('hidden')"
+          style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:1.2rem;padding:4px 8px;line-height:1;">✕</button>
+      </div>
+      <div id="star-content" style="overflow-y:auto;padding:16px 20px;flex:1;"></div>
     </div>
   </div>
 
@@ -1305,10 +1344,11 @@ function applyFilters() {
   const posted      = parseInt(document.getElementById('f-posted').value) || 0;
   const sort        = document.getElementById('f-sort').value;
   const minSalary   = parseInt(document.getElementById('f-min-salary').value) || 0;
+  const category    = document.getElementById('f-category').value;
   const cutoff     = posted ? new Date(Date.now() - posted * 86400000) : null;
 
   // Show / hide clear button
-  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || (sort && sort !== 'newest');
+  const hasFilters = q || selectedInsts.size > 0 || type || employment || selectedLocs.size > 0 || posted || minSalary || category || (sort && sort !== 'newest');
   document.getElementById('btn-clear').classList.toggle('hidden', !hasFilters);
 
   filtered = allJobs.filter(job => {
@@ -1336,6 +1376,8 @@ function applyFilters() {
       const n = parseSalaryNum(job);
       if (n < minSalary) return false;
     }
+
+    if (category && detectArchetype(job) !== category) return false;
 
     if (q) {
       const haystack = `${job.title} ${job.institution} ${job.department} ${job.location} ${job.summary}`.toLowerCase();
@@ -1442,7 +1484,7 @@ function renderCard(job) {
   const postedShort = job.posted ? fmtDateShort(job.posted) : '—';
 
   const cvMatchHtml   = matchMode && cvScores[job.id] != null
-    ? matchBadge(cvScores[job.id], cvReasons[job.id]) : '';
+    ? matchBadge(cvScores[job.id], cvReasons[job.id], job) : '';
   const remoteTag     = job.remote
     ? `<span class="badge" style="background:#f0fdf4;color:#166534;">Remote</span>` : '';
   const typeBadgeHtml = typeBadge(job.type);
@@ -1465,6 +1507,9 @@ function renderCard(job) {
     ? `<a href="${viewHref}" target="_blank" rel="noopener" style="${btnP}">View &amp; Apply ${extIcon}</a>`
     : `<a href="${viewHref}" target="_blank" rel="noopener" style="${btnP}">View Job ${extIcon}</a>
        <a href="${applyHref}" target="_blank" rel="noopener" style="${btnS}">Apply ${extIcon}</a>`;
+
+  const archetype = detectArchetype(job);
+  const archetypeBadge = `<span class="badge" style="background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;font-size:0.7rem;">${esc(archetype)}</span>`;
 
   const tag = salaryTag(job);
 
@@ -1530,7 +1575,7 @@ function renderCard(job) {
       <span class="badge ${badgeCls}">${esc(instLabel)}</span>
     </div>
     <div class="row-col col-loc" style="font-size:0.78rem;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${job.location ? esc(job.location) : '—'}</div>
-    <div class="row-col col-type" style="display:flex;flex-wrap:wrap;gap:3px;">${typeBadgeHtml}${remoteTag}</div>
+    <div class="row-col col-type" style="display:flex;flex-wrap:wrap;gap:3px;">${typeBadgeHtml}${remoteTag}${archetypeBadge}</div>
     <div class="row-col col-date" style="font-size:0.75rem;color:var(--text-3);white-space:nowrap;">${postedShort}</div>
     <button class="share-btn" data-share-url="${esc(job.view || job.apply || '')}"
       data-share-title="${esc(job.title || 'Job Posting')}"
@@ -1550,13 +1595,76 @@ function renderCard(job) {
   </div>
   <div class="card-expand">
     <div class="row-detail">
-      ${detailMeta ? `<div style="font-size:0.73rem;color:var(--text-2);margin-bottom:10px;display:flex;flex-wrap:wrap;align-items:center;">${detailMeta}</div>` : ''}
+      ${detailMeta ? `<div style="font-size:0.73rem;color:var(--text-2);margin-bottom:10px;display:flex;flex-wrap:wrap;align-items:center;">${detailMeta}<span style="margin-left:10px;">${archetypeBadge}</span></div>` : `<div style="margin-bottom:10px;">${archetypeBadge}</div>`}
       ${summary}
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">${actionButtons}${renderTrackBtn(job)}</div>
+      ${renderKeywordGap(job)}
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">${actionButtons}${renderTrackBtn(job)}${renderStarPrepBtn(job)}</div>
       ${renderSimilarJobs(job)}
     </div>
   </div>
 </div>`;
+}
+
+function renderStarPrepBtn(job) {
+  if (!currentUser) return '';
+  const btnStar = `display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:var(--radius);font-size:0.78rem;font-weight:500;color:#7c3aed;background:#f5f3ff;border:1px solid #ddd6fe;cursor:pointer;font-family:inherit;`;
+  return `<button style="${btnStar}" onclick="openStarPrep('${esc(job.id)}',event)" title="Generate STAR interview talking points">✨ STAR Prep</button>`;
+}
+
+async function openStarPrep(jobId, event) {
+  event.stopPropagation();
+  if (!currentUser) { openAuthModal('signin'); return; }
+  const tier = await resolvedTier();
+  if (tier !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
+
+  const job = allJobs.find(j => j.id === jobId) || {};
+  const modal = document.getElementById('star-modal');
+  modal.classList.remove('hidden');
+  document.getElementById('star-job-title').textContent = `${job.title || 'Job'} — ${job.institution || ''}`;
+  const content = document.getElementById('star-content');
+
+  if (!cvTextGlobal) {
+    content.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-2);">
+      <div style="font-size:2rem;margin-bottom:8px;">📄</div>
+      <p style="font-size:0.85rem;">Upload your CV/Resume first to get personalised STAR talking points.</p>
+      <p style="font-size:0.78rem;color:var(--text-3);margin-top:6px;">Click "Match my CV/Resume" in the filter bar, then come back here.</p>
+    </div>`;
+    return;
+  }
+
+  content.innerHTML = '<p style="text-align:center;color:var(--text-3);padding:30px 0;font-size:0.85rem;">✨ Generating STAR talking points for this role…</p>';
+
+  try {
+    const { data, error } = await _sb.functions.invoke('star-prep', {
+      body: {
+        jobTitle:    job.title    || '',
+        institution: job.institution || '',
+        jobSummary:  job.summary  || '',
+        cvText:      cvTextGlobal.substring(0, 4000),
+      }
+    });
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    const points = data?.points || [];
+    content.innerHTML = points.length
+      ? points.map((p, i) => `
+          <div style="margin-bottom:14px;padding:12px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg);">
+            <div style="font-size:0.72rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Talking Point ${i+1}</div>
+            <div style="font-size:0.82rem;color:var(--text-1);line-height:1.7;">
+              <strong style="color:var(--text-2);">Situation:</strong> ${esc(p.situation || '')}<br>
+              <strong style="color:var(--text-2);">Task:</strong> ${esc(p.task || '')}<br>
+              <strong style="color:var(--text-2);">Action:</strong> ${esc(p.action || '')}<br>
+              <strong style="color:var(--text-2);">Result:</strong> ${esc(p.result || '')}
+            </div>
+          </div>`).join('')
+      : '<p style="color:var(--text-3);text-align:center;padding:20px 0;">No talking points were generated. Try uploading a more detailed CV.</p>';
+  } catch (e) {
+    content.innerHTML = `
+      <div style="padding:16px;background:#fef2f2;border-radius:6px;border:1px solid #fca5a5;">
+        <p style="color:#991b1b;font-size:0.82rem;font-weight:600;">Could not generate talking points</p>
+        <p style="color:#7f1d1d;font-size:0.78rem;margin-top:4px;">${esc(e?.message || String(e))}</p>
+        <p style="font-size:0.75rem;color:var(--text-3);margin-top:8px;">Make sure the Supabase Edge Function is deployed and ANTHROPIC_API_KEY is configured.</p>
+      </div>`;
+  }
 }
 
 function renderSimilarJobs(job) {
@@ -1747,7 +1855,7 @@ document.getElementById('search').addEventListener('input', onSearchInput);
 });
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
-  ['f-type','f-employment','f-posted','f-sort','f-min-salary'].forEach(id => {
+  ['f-type','f-employment','f-posted','f-sort','f-min-salary','f-category'].forEach(id => {
     document.getElementById(id).value = id === 'f-sort' ? 'newest' : '';
   });
 
@@ -1770,6 +1878,62 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   applyFilters();
   history.replaceState(null, '', window.location.pathname);  // clear URL hash
 });
+
+// ── Archetype / Category detection ──────────────────────────────────────────────
+const _ARCHETYPE_RULES = [
+  ['Faculty & Research', /\b(professor|faculty|lecturer|instructor|adjunct|postdoc|post.doc|research scientist|research associate|academic|visiting scholar|research fellow|postdoctoral|principal investigator)\b/i],
+  ['IT & Technology',    /\b(information technology|software engineer|software developer|systems analyst|network engineer|cybersecurity|database admin|web developer|help.?desk|programmer|devops|data engineer|application developer|cloud architect|it technician|it support)\b/i],
+  ['Healthcare',         /\b(nurse|nursing|clinical|physician|medical|pharmacy|pharmacist|lab technician|dental|veterinary|therapist|practitioner|patient care|healthcare|radiology|health sciences)\b/i],
+  ['Library & Archives', /\b(librarian|library|archivist|archives|cataloging)\b/i],
+  ['Finance & Accounting', /\b(accountant|accounting|finance|budget analyst|controller|payroll|billing|auditor|financial analyst|procurement|purchasing|contracts specialist|grants accountant|fiscal)\b/i],
+  ['Facilities & Trades', /\b(maintenance|facilities|custodian|groundskeeper|plumber|electrician|carpenter|hvac|mechanic|grounds|custodial|building services|equipment operator)\b/i],
+  ['Human Resources',    /\b(human resources|recruiting|recruiter|hr specialist|benefits|talent acquisition|workforce|employee relations|compensation|onboarding|hr manager)\b/i],
+  ['Communications & Marketing', /\b(communications|marketing|public relations|social media|content writer|editor|journalist|graphic design|videographer|media relations|web content|copywriter)\b/i],
+  ['Legal & Compliance', /\b(legal|attorney|paralegal|compliance|policy analyst|regulatory|general counsel|contracts manager|risk management)\b/i],
+  ['Athletics & Recreation', /\b(athletics|athletic director|\bcoach\b|coaching|sports|recreation|fitness|physical education|intramural)\b/i],
+  ['Student Services',   /\b(student services|academic advisor|enrollment|financial aid|registrar|residence|student affairs|career services|tutoring|academic support|orientation|student success|dean of students)\b/i],
+  ['Safety & Security',  /\b(security officer|campus police|campus safety|emergency management|environmental health|occupational safety|\behs\b|fire safety)\b/i],
+];
+
+function detectArchetype(job) {
+  if (job.tag) return job.tag; // prefer pre-computed tag from jobs.json
+  const text = `${job.title || ''} ${job.department || ''} ${(job.summary || '').substring(0, 300)}`;
+  for (const [name, pat] of _ARCHETYPE_RULES) {
+    if (pat.test(text)) return name;
+  }
+  return 'Administrative';
+}
+
+// ── ATS Keyword Gap Analysis ─────────────────────────────────────────────────
+const _KW_STOP = new Set(('the a an and or but in on at to for of with by from as is was are be been being have has had do does did will would could should may might not all any both this that these those their they them we our you your its it also include including well work position required ability experience skills knowledge related within across ensure support provide develop manage maintain responsible opportunity join team new university college georgia state tech role responsibilities duties report position working environment ability required requirements must each other own some such then through under after while also even during between without upon both such further though where however therefore since used using various often may well across within').split(' '));
+
+function extractJobKeywords(job) {
+  const text = `${job.title || ''} ${job.department || ''} ${job.summary || ''}`.toLowerCase();
+  const words = text.match(/\b[a-z][\w\-]{3,}\b/g) || [];
+  const freq = {};
+  words.forEach(w => { if (!_KW_STOP.has(w)) freq[w] = (freq[w] || 0) + 1; });
+  return Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 28).map(([w]) => w);
+}
+
+function renderKeywordGap(job) {
+  if (!matchMode || !cvTextGlobal) return '';
+  const keywords = extractJobKeywords(job);
+  if (!keywords.length) return '';
+  const cvLower = cvTextGlobal.toLowerCase();
+  const found   = keywords.filter(k => cvLower.includes(k));
+  const missing = keywords.filter(k => !cvLower.includes(k)).slice(0, 12);
+  if (!missing.length) return `<div style="margin-top:10px;font-size:0.75rem;color:#166534;">✅ All key terms from this posting appear in your CV.</div>`;
+  const chip = (k, color, bg, border) =>
+    `<span style="display:inline-block;padding:1px 8px;margin:2px 2px 2px 0;border-radius:10px;font-size:0.72rem;background:${bg};border:1px solid ${border};color:${color};">${esc(k)}</span>`;
+  const missingHtml = missing.map(k => chip(k,'#991b1b','#fef2f2','#fca5a5')).join('');
+  const foundHtml   = found.slice(0,7).map(k => chip(k,'#166534','#f0fdf4','#86efac')).join('');
+  return `
+    <div style="margin-top:12px;padding:10px 12px;border-radius:6px;background:var(--bg-2);border:1px solid var(--border);">
+      <div style="font-size:0.72rem;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">🎯 ATS Keyword Gap</div>
+      <div style="margin-bottom:5px;"><span style="font-size:0.72rem;color:#991b1b;font-weight:500;">Missing from your CV: </span>${missingHtml}</div>
+      ${found.length ? `<div><span style="font-size:0.72rem;color:#166534;font-weight:500;">Found in your CV: </span>${foundHtml}</div>` : ''}
+    </div>`;
+}
 
 // ── CV Matching ─────────────────────────────────────────────────────────────────
 let cvScores  = {};     // jobId → normalised score 0‥1
@@ -1999,13 +2163,35 @@ function updateCVStatus(msg) {
   if (el) el.textContent = msg;
 }
 
-function matchBadge(score, reason) {
+function matchBadge(score, reason, job) {
   const pct = Math.round(score * 100);
   if (pct < 5) return '';
   const cls  = pct >= 60 ? 'match-high' : pct >= 30 ? 'match-med' : 'match-low';
   const star = pct >= 60 ? '⭐ ' : '';
   const label = `${star}${pct}% match`;
-  const tip = reason || (pct >= 75 ? 'Strong field and title alignment with your CV.' : pct >= 50 ? 'Moderate alignment with your background.' : 'Some overlap with your CV, but limited alignment.');
+
+  // Build a rich breakdown tooltip
+  let tip = reason || '';
+  if (job && cvTextGlobal) {
+    const cv = cvTextGlobal.toLowerCase();
+    const keywords = extractJobKeywords(job);
+    const found = keywords.filter(k => cv.includes(k));
+    const kw_pct = keywords.length ? Math.round((found.length / keywords.length) * 100) : 0;
+    const breakdown = [`Keywords: ${kw_pct}%`];
+    // Seniority indicator
+    const cvLvl = (typeof detectCVLevel === 'function') ? detectCVLevel(cvTextGlobal) : '';
+    const jobLvl = (typeof detectJobLevel === 'function') ? detectJobLevel(job) : '';
+    if (cvLvl && jobLvl && cvLvl !== 'unknown' && jobLvl !== 'unknown') {
+      const seniorityOk = cvLvl === jobLvl || (cvLvl === 'senior' && jobLvl === 'mid') || (cvLvl === 'mid' && jobLvl === 'entry');
+      breakdown.push(`Seniority: ${seniorityOk ? '✓ good fit' : '⚠ may be over/underqualified'}`);
+    }
+    if (breakdown.length) {
+      if (tip) tip += ' · ';
+      tip += breakdown.join(' · ');
+    }
+  }
+  if (!tip) tip = pct >= 75 ? 'Strong field and title alignment with your CV.' : pct >= 50 ? 'Moderate alignment with your background.' : 'Some overlap with your CV, but limited alignment.';
+
   const safeReason = tip.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<span class="badge ${cls} match-badge-tip" data-tip="${safeReason}">${label}</span>`;
 }
@@ -2645,6 +2831,8 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
         <div class="tier-feature">✅ Everything in Free</div>
         <div class="tier-feature">✅ Daily email alerts</div>
         <div class="tier-feature">✅ CV upload &amp; matching</div>
+        <div class="tier-feature">✅ ATS keyword gap analysis</div>
+        <div class="tier-feature">✅ STAR interview prep</div>
         <div class="tier-feature">✅ AI career coach</div>
         <div class="tier-feature">✅ Job market analytics</div>
       </div>
