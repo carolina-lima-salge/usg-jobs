@@ -2653,7 +2653,11 @@ function updateHeaderUI() {
   if (currentUser) {
     btnSignin.classList.add('hidden');   btnSignin.style.display = 'none';
     btnUser.classList.remove('hidden');  btnUser.style.display   = 'inline-flex';
-    const name    = userProfile?.full_name || '';
+    // Prefer profile full_name, fall back to OAuth metadata name, then email prefix
+    const name    = userProfile?.full_name
+                 || currentUser.user_metadata?.full_name
+                 || currentUser.user_metadata?.name
+                 || '';
     const initial = (name || currentUser.email || '?')[0].toUpperCase();
     avatar.textContent = initial;
     label.textContent  = name || currentUser.email.split('@')[0];
@@ -3031,10 +3035,7 @@ async function saveProfile() {
   } else {
     msg.textContent = 'Profile saved!'; msg.className = 'auth-msg ok';
     userProfile = { ...(userProfile || {}), ...payload };
-    // Update avatar initial
-    const initial = payload.full_name ? payload.full_name[0].toUpperCase() : currentUser.email[0].toUpperCase();
-    const av = document.getElementById('user-avatar');
-    if (av) av.textContent = initial;
+    updateHeaderUI(); // refresh name + avatar in header immediately
   }
 }
 
