@@ -2874,6 +2874,8 @@ async function loadProfile() {
     ));
   } catch(e) { console.warn('Profile fetch error:', e); }
   userProfile = data;
+  // Refresh header label now that we have the full name
+  updateHeaderUI();
   // Show "Upgrade" for free users; basic users can upgrade to Pro; only Pro stays hidden
   const subBtn = document.getElementById('umenu-subscribe');
   const isPro = data?.subscription_status === 'active' && data?.subscription_tier === 'pro';
