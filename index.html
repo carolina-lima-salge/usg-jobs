@@ -801,7 +801,9 @@
           Clear
         </button>
 
-        <span id="result-count" style="font-size:0.78rem;color:var(--text-3);white-space:nowrap;"></span>
+        <!-- spacer pushes count to the right -->
+        <span style="flex:1;min-width:0;"></span>
+        <span id="result-count" style="font-size:0.78rem;color:var(--text-3);white-space:nowrap;flex-shrink:0;"></span>
       </div>
     </div>
   </div>
@@ -1923,7 +1925,7 @@ function loadStateFromHash() {
 
 // ── Event listeners ────────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', onSearchInput);
-['f-type','f-employment','f-posted','f-sort','f-min-salary'].forEach(id => {
+['f-type','f-employment','f-posted','f-sort','f-min-salary','f-category'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); saveStateToHash(); });
 });
 document.getElementById('btn-clear').addEventListener('click', () => {
