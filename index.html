@@ -476,6 +476,8 @@
       }
       .filter-secondary::-webkit-scrollbar { display: none; }
       .filter-secondary .filter-sep { display: none; }
+      /* CV button appears first in the scrollable secondary row on mobile */
+      #btn-cv-toggle { order: -1; }
       #result-count { display: none; }
 
       /* Auth/profile modals: full-height on mobile */
@@ -667,7 +669,7 @@
             <button class="umenu-item" onclick="showTracker()">📋 My applications</button>
             <button class="umenu-item" onclick="showAlertSettings()">🔔 Email alerts</button>
             <button class="umenu-item" onclick="showProfileSettings()">👤 My profile</button>
-            <button class="umenu-item" onclick="openAnalytics()" id="umenu-analytics" style="display:none;">📊 Analytics</button>
+            <button class="umenu-item" onclick="openAnalytics()" id="umenu-analytics">📊 Analytics</button>
             <button class="umenu-item" onclick="showSubscribePage()" id="umenu-subscribe" style="display:none;">✨ Upgrade to Pro</button>
             <hr class="umenu-divider">
             <button class="umenu-item danger" onclick="doSignOut()">Sign out</button>
@@ -682,7 +684,7 @@
 <div id="filter-bar" class="sticky top-0 z-20">
   <div style="max-width:1100px;margin:0 auto;padding:8px 20px;">
     <div class="filter-row">
-      <!-- Row 1: Search + CV Match (stays together on mobile) -->
+      <!-- Row 1: Search only (full-width on mobile) -->
       <div class="filter-primary">
         <div style="position:relative;flex:1;min-width:0;">
           <svg style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-3);pointer-events:none;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -695,11 +697,6 @@
                  onblur="this.style.outline='none'" />
           <datalist id="search-suggestions"></datalist>
         </div>
-        <!-- CV Match button -->
-        <button id="btn-cv-toggle" type="button"
-          style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:600;padding:0 12px;height:30px;border-radius:var(--radius);border:none;color:#fff;background:var(--accent);cursor:pointer;white-space:nowrap;font-family:inherit;transition:all 0.12s;flex-shrink:0;">
-          Match my CV/Resume
-        </button>
       </div>
 
       <!-- Row 2: Filter selects (horizontally scrollable on mobile) -->
@@ -770,6 +767,12 @@
           <option value="75000">$75K+</option>
           <option value="100000">$100K+</option>
         </select>
+
+        <!-- CV/Resume match button -->
+        <button id="btn-cv-toggle"
+          style="font-size:0.78rem;padding:5px 10px;border-radius:var(--radius);border:none;cursor:pointer;white-space:nowrap;font-family:inherit;background:var(--accent);color:#fff;font-weight:500;flex-shrink:0;height:30px;">
+          Match my CV/Resume
+        </button>
 
         <!-- Separator -->
         <div class="filter-sep" style="width:1px;height:18px;background:var(--border);flex-shrink:0;"></div>
@@ -2635,9 +2638,10 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
         <div class="tier-feature">✅ All job listings</div>
         <div class="tier-feature">✅ All search &amp; filters</div>
         <div class="tier-feature">✅ Weekly email alerts</div>
-        <div class="tier-feature muted">— Application tracking</div>
+        <div class="tier-feature">✅ Application tracking</div>
         <div class="tier-feature muted">— CV matching</div>
         <div class="tier-feature muted">— AI career coach</div>
+        <div class="tier-feature muted">— Job market analytics</div>
       </div>
 
       <!-- T2: Pro -->
@@ -2646,9 +2650,9 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
         <div class="tier-price" style="color:#7c3aed;">$7<span> / month</span></div>
         <div class="tier-feature">✅ Everything in Free</div>
         <div class="tier-feature">✅ Daily email alerts</div>
-        <div class="tier-feature">✅ Application tracking</div>
         <div class="tier-feature">✅ CV upload &amp; matching</div>
         <div class="tier-feature">✅ AI career coach</div>
+        <div class="tier-feature">✅ Job market analytics</div>
       </div>
     </div>
 
@@ -2742,7 +2746,6 @@ _sb.auth.onAuthStateChange(async (event, session) => {
   } else {
     savedJobIds.clear();
     userProfile = null;
-    _saveProCache(null, false); // clear pro cache on sign-out
     refreshSaveButtons();
     freeSampleSet = null;  // reset sample so a new one is drawn for anonymous visitors
     updateFreeSample();
@@ -2752,25 +2755,6 @@ _sb.auth.onAuthStateChange(async (event, session) => {
 
 // ── Pro-status cache ──────────────────────────────────────────────────────────
 // Store pro status in localStorage so the analytics button appears instantly on
-// every page load/navigation without waiting for Supabase to respond.
-const _PRO_KEY = 'usg_pro_uid'; // value = user id when pro; absent = not pro
-
-function _saveProCache(uid, isPro) {
-  try {
-    if (isPro && uid) localStorage.setItem(_PRO_KEY, uid);
-    else             localStorage.removeItem(_PRO_KEY);
-  } catch(e) {}
-}
-function _isProCached() {
-  try { return !!localStorage.getItem(_PRO_KEY); } catch(e) { return false; }
-}
-
-// Apply the cache immediately so the analytics button shows before loadProfile finishes
-(function _applyProCache() {
-  const btn = document.getElementById('umenu-analytics');
-  if (btn && _isProCached()) btn.style.display = '';
-})();
-
 // ── Header UI ─────────────────────────────────────────────────────────────────
 function updateHeaderUI() {
   const btnSignin = document.getElementById('btn-signin');
@@ -2790,10 +2774,8 @@ function updateHeaderUI() {
     label.textContent  = name || currentUser.email.split('@')[0];
     // Show upgrade button for free users; hide for Pro (basic treated as pro via getUserTier)
     const subBtn = document.getElementById('umenu-subscribe');
-    const analyticsBtn = document.getElementById('umenu-analytics');
     const isPro = getUserTier() === 'pro';
     if (subBtn) subBtn.style.display = isPro ? 'none' : '';
-    if (analyticsBtn) analyticsBtn.style.display = isPro ? '' : 'none';
     const plansBtn = document.getElementById('btn-view-plans');
     if (plansBtn) plansBtn.style.display = isPro ? 'none' : '';
   } else {
@@ -2802,8 +2784,6 @@ function updateHeaderUI() {
     document.getElementById('user-menu-panel').classList.add('hidden');
     const subBtn = document.getElementById('umenu-subscribe');
     if (subBtn) subBtn.style.display = 'none';
-    const analyticsBtn = document.getElementById('umenu-analytics');
-    if (analyticsBtn) analyticsBtn.style.display = 'none';
     const plansBtn = document.getElementById('btn-view-plans');
     if (plansBtn) plansBtn.style.display = '';
   }
@@ -3083,18 +3063,8 @@ async function loadProfile() {
     ));
   } catch(e) { console.warn('Profile fetch error:', e); }
   userProfile = data;
-  // Persist pro status so analytics button shows instantly on next page load
-  const isPro = getUserTier() === 'pro';
-  _saveProCache(currentUser?.id, isPro);
-  // Refresh header label now that we have the full name
+  // Refresh header label now that we have the full name (also updates subscribe button visibility)
   updateHeaderUI();
-  // Show "Upgrade" for free users; hide for Pro
-  const subBtn = document.getElementById('umenu-subscribe');
-  const analyticsBtn = document.getElementById('umenu-analytics');
-  if (subBtn) subBtn.style.display = isPro ? 'none' : '';
-  if (analyticsBtn) analyticsBtn.style.display = isPro ? '' : 'none';
-  const plansBtn = document.getElementById('btn-view-plans');
-  if (plansBtn) plansBtn.style.display = isPro ? 'none' : '';
   // Update plan badge in profile modal if open
   updatePlanBadge(data?.subscription_status, data?.subscription_tier);
   // Re-evaluate free sample and re-render jobs now that tier is known
@@ -3239,7 +3209,21 @@ function selectTier(tier) {
 
 function openAnalytics() {
   document.getElementById('user-menu-panel').classList.add('hidden');
-  window.open('analytics.html', '_blank');
+  const tier = getUserTier();
+  if (tier === 'pending') {
+    // Profile still loading — wait briefly then retry
+    setTimeout(() => {
+      const t = getUserTier();
+      if (t === 'pro') window.open('analytics.html', '_blank');
+      else showSubscribePage();
+    }, 1500);
+    return;
+  }
+  if (tier === 'pro') {
+    window.open('analytics.html', '_blank');
+  } else {
+    showSubscribePage();
+  }
 }
 
 function showSubscribePage() {
