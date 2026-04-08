@@ -2770,8 +2770,11 @@ function updateHeaderUI() {
   if (currentUser) {
     btnSignin.classList.add('hidden');   btnSignin.style.display = 'none';
     btnUser.classList.remove('hidden');  btnUser.style.display   = 'inline-flex';
-    // Prefer profile full_name, fall back to OAuth metadata name, then email prefix
+    // Prefer profile full_name, fall back to cache (when profile still loading), then OAuth metadata, then email prefix
+    const _cachedForName = (userProfile === undefined && currentUser)
+      ? _loadProfileCache(currentUser.id) : null;
     const name    = userProfile?.full_name
+                 || _cachedForName?.full_name
                  || currentUser.user_metadata?.full_name
                  || currentUser.user_metadata?.name
                  || '';
