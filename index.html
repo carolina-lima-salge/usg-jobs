@@ -163,9 +163,13 @@
     /* ── Filter toolbar ── */
     #filter-bar { border-bottom: 1px solid var(--border); background: var(--surface); }
     .filter-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-    /* On desktop these wrappers are invisible — children join .filter-row's flex directly */
-    .filter-primary  { display: contents; }
-    .filter-secondary { display: contents; }
+    /* Row 1: search only — grows to fill its own line */
+    .filter-primary  { display: flex; align-items: center; flex: 1; min-width: 0; }
+    /* Row 2: all filter controls — forced onto its own line via flex-basis:100% */
+    .filter-secondary {
+      display: flex; align-items: center; gap: 6px;
+      flex-basis: 100%; flex-wrap: nowrap;
+    }
     select.filter-select {
       border: 1px solid var(--border); border-radius: var(--radius);
       padding: 5px 26px 5px 10px; font-size: 0.8rem; background: var(--surface);
@@ -466,10 +470,9 @@
       /* Filter bar: two-row layout */
       #filter-bar > div { padding: 7px 10px !important; }
       #filter-bar .filter-row { flex-direction: column; align-items: stretch; gap: 5px; flex-wrap: nowrap; }
-      /* Restore real flex boxes on mobile (overrides desktop display:contents) */
-      .filter-primary  { display: flex; align-items: center; gap: 6px; }
+      .filter-primary  { flex: unset; }
       .filter-secondary {
-        display: flex; align-items: center;
+        flex-basis: auto; /* reset desktop 100% basis; mobile column handles width */
         overflow-x: auto; flex-wrap: nowrap;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 2px; gap: 5px;

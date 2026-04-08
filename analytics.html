@@ -308,8 +308,22 @@ async function init() {
   const data = await res.json();
   const meta = data.meta || {};
 
-  // Use all jobs to match main site count exactly
-  const jobs = data.jobs || [];
+  // Apply the same filters as the main site so counts match exactly:
+  // drop jobs posted more than 6 months ago, and drop jobs whose closing date has already passed
+  const sixMonthsAgo = new Date(Date.now() - 183 * 86400000);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  function parseDate(s) {
+    if (!s) return null;
+    const d = new Date(s + 'T00:00:00'); // local time parse (avoids UTC day-off errors)
+    return isNaN(d) ? null : d;
+  }
+  const jobs = (data.jobs || []).filter(job => {
+    const posted = parseDate(job.posted);
+    if (posted && posted < sixMonthsAgo) return false;  // too old
+    const closes = parseDate(job.closes);
+    if (closes && closes < today) return false;          // already closed
+    return true;
+  });
 
   const lastUpdated = meta.last_updated ? ` · Updated ${meta.last_updated}` : '';
   document.getElementById('dash-sub').textContent =
