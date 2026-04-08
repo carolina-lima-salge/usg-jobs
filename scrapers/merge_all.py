@@ -336,7 +336,7 @@ def merge_all(summary_only: bool = False) -> list[dict]:
     # Per-institution breakdown
     inst_counts: dict[str, int] = {}
     for j in all_jobs:
-        inst = j.get("institution", "Unknown")
+        inst = j.get("institution", "Not Reported")
         inst_counts[inst] = inst_counts.get(inst, 0) + 1
 
     print(f"  {'Institution':<45}  {'Jobs':>5}")
