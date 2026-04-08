@@ -2476,7 +2476,7 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
       </p>
     </div>
 
-    <!-- Password reset -->
+    <!-- Password reset request -->
     <div id="auth-view-reset" class="hidden">
       <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:12px;">Enter your email and we'll send a reset link.</p>
       <input class="auth-input" type="email" id="rs-email" placeholder="Email address" autocomplete="email" />
@@ -2485,6 +2485,15 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
       <p style="text-align:center;margin-top:12px;font-size:0.75rem;">
         <a href="#" onclick="authTab('signin');return false;" style="color:var(--accent);">Back to sign in</a>
       </p>
+    </div>
+
+    <!-- Set new password (shown after clicking email link) -->
+    <div id="auth-view-newpassword" class="hidden">
+      <p style="font-size:0.82rem;color:var(--text-2);margin-bottom:12px;">Choose a new password for your account.</p>
+      <input class="auth-input" type="password" id="np-password" placeholder="New password (min 6 characters)" autocomplete="new-password" />
+      <input class="auth-input" type="password" id="np-confirm"  placeholder="Confirm new password" autocomplete="new-password" />
+      <button class="auth-btn-primary" id="np-btn" onclick="doUpdatePassword()">Set new password</button>
+      <div class="auth-msg" id="np-msg"></div>
     </div>
   </div>
 </div>
@@ -2670,6 +2679,11 @@ let savedJobIds  = new Set();   // job IDs the current user has saved
 
 // ── Auth state listener ───────────────────────────────────────────────────────
 _sb.auth.onAuthStateChange(async (event, session) => {
+  // When the user clicks the reset link in their email, show the new-password form
+  if (event === 'PASSWORD_RECOVERY') {
+    openAuthModal('newpassword');
+    return;
+  }
   currentUser = session?.user ?? null;
   updateHeaderUI();
   if (currentUser) {
@@ -2745,12 +2759,12 @@ function handleOverlayClick(e) {
 }
 
 function authTab(view) {
-  ['signin','signup','reset'].forEach(v => {
+  ['signin','signup','reset','newpassword'].forEach(v => {
     document.getElementById(`auth-view-${v}`).classList.toggle('hidden', v !== view);
     const tab = document.getElementById(`auth-tab-${v}`);
     if (tab) tab.classList.toggle('active', v === view);
   });
-  const titles = { signin: 'Sign in to USG Jobs', signup: 'Create an account', reset: 'Reset password' };
+  const titles = { signin: 'Sign in to USG Jobs', signup: 'Create an account', reset: 'Reset password', newpassword: 'Set new password' };
   document.getElementById('auth-modal-title').textContent = titles[view] || '';
 }
 
@@ -2804,6 +2818,21 @@ async function doResetPassword() {
   btn.disabled = false; btn.textContent = 'Send reset link';
   if (error) { showMsg(msg, error.message, 'err'); return; }
   showMsg(msg, '✓ Reset link sent! Check your email.', 'ok');
+}
+
+async function doUpdatePassword() {
+  const pass    = document.getElementById('np-password').value;
+  const confirm = document.getElementById('np-confirm').value;
+  const btn     = document.getElementById('np-btn');
+  const msg     = document.getElementById('np-msg');
+  if (!pass || pass.length < 6) { showMsg(msg, 'Password must be at least 6 characters.', 'err'); return; }
+  if (pass !== confirm)          { showMsg(msg, 'Passwords do not match.', 'err'); return; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const { error } = await _sb.auth.updateUser({ password: pass });
+  btn.disabled = false; btn.textContent = 'Set new password';
+  if (error) { showMsg(msg, error.message, 'err'); return; }
+  showMsg(msg, '✓ Password updated! You are now signed in.', 'ok');
+  setTimeout(() => closeAuthModal(), 1800);
 }
 
 function showMsg(el, text, type) {
