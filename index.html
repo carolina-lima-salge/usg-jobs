@@ -135,23 +135,19 @@
     .match-med  { background: #fefce8; color: #854d0e; }
     .match-low  { background: #f9fafb; color: var(--text-2); border: 1px solid var(--border); }
 
-    /* ── Match badge tooltip ── */
-    .match-wrap {
-      position: relative; display: inline-block;
-    }
-    .match-wrap .match-tip {
-      display: none;
-      position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+    /* ── Match badge tooltip (global, fixed-position to avoid overflow clipping) ── */
+    #match-global-tip {
+      display: none; position: fixed; z-index: 9999; pointer-events: none;
       background: #1e293b; color: #f1f5f9; font-size: 0.74rem; font-weight: 400;
-      line-height: 1.45; padding: 7px 11px; border-radius: 6px;
-      white-space: normal; width: 230px; text-align: left;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.22); z-index: 999; pointer-events: none;
+      line-height: 1.5; padding: 8px 12px; border-radius: 6px;
+      white-space: normal; width: 240px; text-align: left;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.28);
     }
-    .match-wrap .match-tip::after {
+    #match-global-tip::after {
       content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
       border: 6px solid transparent; border-top-color: #1e293b;
     }
-    .match-wrap:hover .match-tip { display: block; }
+    .match-badge-tip { cursor: help; }
 
     /* ── Pagination ── */
     .page-btn {
@@ -1939,12 +1935,12 @@ function updateCVStatus(msg) {
 function matchBadge(score, reason) {
   const pct = Math.round(score * 100);
   if (pct < 5) return '';
-  const cls   = pct >= 60 ? 'match-high' : pct >= 30 ? 'match-med' : 'match-low';
-  const star  = pct >= 60 ? '⭐ ' : '';
+  const cls  = pct >= 60 ? 'match-high' : pct >= 30 ? 'match-med' : 'match-low';
+  const star = pct >= 60 ? '⭐ ' : '';
   const label = `${star}${pct}% match`;
-  if (!reason) return `<span class="badge ${cls}">${label}</span>`;
-  const safeReason = reason.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return `<span class="match-wrap"><span class="badge ${cls}" style="cursor:help">${label}</span><span class="match-tip"><strong>${pct}% match</strong><br>${safeReason}</span></span>`;
+  const tip = reason || (pct >= 75 ? 'Strong field and title alignment with your CV.' : pct >= 50 ? 'Moderate alignment with your background.' : 'Some overlap with your CV, but limited alignment.');
+  const safeReason = tip.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<span class="badge ${cls} match-badge-tip" data-tip="${safeReason}">${label}</span>`;
 }
 
 // ── File parsing ────────────────────────────────────────────────────────────────
@@ -3438,6 +3434,40 @@ function hideTracker() {
   document.getElementById('results-panel').classList.remove('hidden');
   applyFilters();
 }
+</script>
+
+<!-- Global match tooltip (fixed-position, bypasses all overflow:hidden containers) -->
+<div id="match-global-tip"></div>
+<script>
+(function() {
+  const tip = document.getElementById('match-global-tip');
+  document.addEventListener('mouseover', function(e) {
+    const badge = e.target.closest('.match-badge-tip');
+    if (!badge) return;
+    const text = badge.dataset.tip;
+    if (!text) return;
+    tip.innerHTML = text;
+    tip.style.display = 'block';
+    positionTip(badge);
+  });
+  document.addEventListener('mouseout', function(e) {
+    if (!e.target.closest('.match-badge-tip')) return;
+    tip.style.display = 'none';
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (tip.style.display === 'none') return;
+    const badge = e.target.closest('.match-badge-tip');
+    if (badge) positionTip(badge);
+  });
+  function positionTip(badge) {
+    const r = badge.getBoundingClientRect();
+    const tw = tip.offsetWidth;
+    let left = r.left + r.width / 2 - tw / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    tip.style.left = left + 'px';
+    tip.style.top  = (r.top - tip.offsetHeight - 10) + 'px';
+  }
+})();
 </script>
 </body>
 </html>
