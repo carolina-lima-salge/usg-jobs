@@ -1101,6 +1101,23 @@ async function loadData() {
 
     buildSearchSuggestions();
     applyFilters();
+
+    // Restore CV match state from previous session if available
+    try {
+      const savedText    = localStorage.getItem('usg_cv_text');
+      const savedScores  = localStorage.getItem('usg_cv_scores');
+      const savedReasons = localStorage.getItem('usg_cv_reasons');
+      if (savedText && savedScores) {
+        cvTextGlobal = savedText;
+        cvScores     = JSON.parse(savedScores);
+        cvReasons    = savedReasons ? JSON.parse(savedReasons) : {};
+        matchMode    = true;
+        currentPage  = 1;
+        applyFilters();
+        setCVActiveButton();
+      }
+    } catch(_) { /* corrupt storage — ignore */ }
+
   } catch(e) {
     document.getElementById('loading').innerHTML =
       `<p style="color:#c0392b;">Failed to load jobs data: ${e.message}</p>`;
@@ -2124,14 +2141,16 @@ async function parseAndMatchCV(file) {
       }
     }
 
+    // Persist CV state so it survives a page refresh
+    try {
+      localStorage.setItem('usg_cv_text',    cvTextGlobal);
+      localStorage.setItem('usg_cv_scores',  JSON.stringify(cvScores));
+      localStorage.setItem('usg_cv_reasons', JSON.stringify(cvReasons));
+    } catch(_) { /* quota exceeded — non-fatal */ }
+
     // Hide panel after CV loaded
     document.getElementById('cv-panel').classList.add('hidden');
-    const cvBtn = document.getElementById('btn-cv-toggle');
-    cvBtn.textContent = 'Remove CV ×';
-    cvBtn.style.background = 'var(--surface)';
-    cvBtn.style.color = '#b91c1c';
-    cvBtn.style.borderColor = '#fca5a5';
-    // coach button already visible always
+    setCVActiveButton();
 
   } catch (err) {
     document.getElementById('cv-analyzing').classList.add('hidden');
@@ -2141,10 +2160,19 @@ async function parseAndMatchCV(file) {
   }
 }
 
+function setCVActiveButton() {
+  const cvBtn = document.getElementById('btn-cv-toggle');
+  cvBtn.textContent = 'Remove CV ×';
+  cvBtn.style.background = 'var(--surface)';
+  cvBtn.style.color = '#b91c1c';
+  cvBtn.style.borderColor = '#fca5a5';
+}
+
 function clearCVMatch() {
   cvScores     = {};
   cvReasons    = {};
   cvTextGlobal = '';
+  try { localStorage.removeItem('usg_cv_text'); localStorage.removeItem('usg_cv_scores'); localStorage.removeItem('usg_cv_reasons'); } catch(_) {}
   coachHistory = [];
   coachReady   = false;
   coachOpen    = false;
