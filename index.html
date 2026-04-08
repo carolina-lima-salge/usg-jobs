@@ -2866,10 +2866,13 @@ async function loadProfile() {
   if (!currentUser) return;
   // Race the Supabase fetch against a 10-second timeout so a hanging
   // network call doesn't keep the user in 'pending' tier forever.
-  const { data } = await sbQuery(
-    _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(),
-    10000, null
-  );
+  let data = null;
+  try {
+    ({ data } = await sbQuery(
+      _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(),
+      10000, null
+    ));
+  } catch(e) { console.warn('Profile fetch error:', e); }
   userProfile = data;
   // Show "Upgrade" for free users; basic users can upgrade to Pro; only Pro stays hidden
   const subBtn = document.getElementById('umenu-subscribe');
@@ -2901,7 +2904,7 @@ function updatePlanBadge(status, tier) {
 async function showProfileSettings() {
   document.getElementById('user-menu-panel').classList.add('hidden');
   if (!currentUser) { openAuthModal('signin'); return; }
-  await loadProfile();
+  try { await loadProfile(); } catch(e) { console.warn('loadProfile failed:', e); }
   const d = userProfile || {};
   document.getElementById('pf-name').value     = d.full_name  || '';
   document.getElementById('pf-phone').value    = d.phone      || '';
