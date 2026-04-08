@@ -167,9 +167,8 @@
     /* Row 1: search grows, CV button pinned right */
     .filter-primary { display: flex; align-items: center; gap: 8px; }
     .filter-primary > div:first-child { flex: 1; min-width: 0; }
-    /* Row 2: filter chips — scrolls horizontally if content overflows */
-    .filter-secondary { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .filter-secondary::-webkit-scrollbar { display: none; }
+    /* Row 2: filter chips */
+    .filter-secondary { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow: visible; }
     select.filter-select {
       border: 1px solid var(--border); border-radius: var(--radius);
       padding: 5px 26px 5px 10px; font-size: 0.8rem; background: var(--surface);
