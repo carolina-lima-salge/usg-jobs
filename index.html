@@ -56,7 +56,7 @@
 
     .row-header {
       display: grid;
-      grid-template-columns: 1fr 160px 130px 78px 108px 65px 24px 32px;
+      grid-template-columns: 1fr 160px 130px 78px 108px 95px 24px 32px;
       align-items: center;
       padding: 11px 16px;
       cursor: pointer;
@@ -75,7 +75,7 @@
     /* Table column header */
     #tbl-header {
       display: grid;
-      grid-template-columns: 1fr 160px 130px 78px 108px 65px 24px 32px;
+      grid-template-columns: 1fr 160px 130px 78px 108px 95px 24px 32px;
       padding: 7px 16px;
       background: #f8fafc;
       border-bottom: 1px solid var(--border-strong);
@@ -455,8 +455,8 @@
 
     /* ── Tablet (≤900px): hide location, keep Type + Category ── */
     @media (max-width: 900px) {
-      .row-header { grid-template-columns: 1fr 145px 76px 100px 58px 20px 26px; }
-      #tbl-header  { grid-template-columns: 1fr 145px 76px 100px 58px 20px 26px; }
+      .row-header { grid-template-columns: 1fr 145px 76px 100px 85px 20px 26px; }
+      #tbl-header  { grid-template-columns: 1fr 145px 76px 100px 85px 20px 26px; }
       .row-col.col-loc { display: none; }
     }
 
@@ -875,7 +875,7 @@
       <div class="tbl-col-label col-type">Job Type</div>
       <div class="tbl-col-label col-cat">Category</div>
       <div class="tbl-col-label col-date sortable" id="col-sort-posted" onclick="togglePostedSort()" title="Sort by date posted">
-        Posted <span id="col-sort-arrow" style="font-size:0.75rem;">↕</span>
+        Posted Date <span id="col-sort-arrow" style="font-size:0.75rem;">↕</span>
       </div>
       <div class="tbl-col-label"></div>
     </div>
