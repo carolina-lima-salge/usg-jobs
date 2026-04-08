@@ -2738,9 +2738,12 @@ _sb.auth.onAuthStateChange(async (event, session) => {
     return;
   }
   currentUser = session?.user ?? null;
+  // Set userProfile to undefined (pending) BEFORE updateHeaderUI so that getUserTier()
+  // returns 'pending' rather than 'free' during the gap between SIGNED_OUT and loadProfile.
+  if (currentUser) userProfile = undefined;
   updateHeaderUI();
   if (currentUser) {
-    userProfile = undefined;  // mark as pending until loadProfile completes
+    // userProfile already set to undefined above
     // Re-render immediately so the banner hides while the profile loads
     if (allJobs.length > 0) applyFilters();
     await loadSavedJobIds();
@@ -2756,8 +2759,6 @@ _sb.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
-// ── Pro-status cache ──────────────────────────────────────────────────────────
-// Store pro status in localStorage so the analytics button appears instantly on
 // ── Header UI ─────────────────────────────────────────────────────────────────
 function updateHeaderUI() {
   const btnSignin = document.getElementById('btn-signin');
@@ -2775,12 +2776,15 @@ function updateHeaderUI() {
     const initial = (name || currentUser.email || '?')[0].toUpperCase();
     avatar.textContent = initial;
     label.textContent  = name || currentUser.email.split('@')[0];
-    // Show upgrade button for free users; hide for Pro (basic treated as pro via getUserTier)
+    // Show upgrade button only once we know the tier (not while profile is still loading)
     const subBtn = document.getElementById('umenu-subscribe');
-    const isPro = getUserTier() === 'pro';
-    if (subBtn) subBtn.style.display = isPro ? 'none' : '';
+    const tier = getUserTier();
+    const isPro = tier === 'pro';
+    const isPending = tier === 'pending';
+    // Hide subscribe while pending so it never briefly flickers visible for Pro users
+    if (subBtn) subBtn.style.display = (isPro || isPending) ? 'none' : '';
     const plansBtn = document.getElementById('btn-view-plans');
-    if (plansBtn) plansBtn.style.display = isPro ? 'none' : '';
+    if (plansBtn) plansBtn.style.display = (isPro || isPending) ? 'none' : '';
   } else {
     btnSignin.classList.remove('hidden'); btnSignin.style.display = '';
     btnUser.classList.add('hidden');      btnUser.style.display   = 'none';
@@ -3210,17 +3214,15 @@ function selectTier(tier) {
   }
 }
 
-function openAnalytics() {
+async function openAnalytics() {
   document.getElementById('user-menu-panel').classList.add('hidden');
-  const tier = getUserTier();
+  let tier = getUserTier();
+  // If profile is still loading, wait up to 6 s then re-check (same pattern as CV button)
   if (tier === 'pending') {
-    // Profile still loading — wait briefly then retry
-    setTimeout(() => {
-      const t = getUserTier();
-      if (t === 'pro') window.open('analytics.html', '_blank');
-      else showSubscribePage();
-    }, 1500);
-    return;
+    for (let i = 0; i < 12 && getUserTier() === 'pending'; i++) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+    tier = getUserTier();
   }
   if (tier === 'pro') {
     window.open('analytics.html', '_blank');
