@@ -685,7 +685,7 @@
 
 <!-- ── Filter bar (sticky) ──────────────────────────────────────────────────── -->
 <div id="filter-bar" class="sticky top-0 z-20">
-  <div style="max-width:1100px;margin:0 auto;padding:8px 20px;">
+  <div style="max-width:1400px;margin:0 auto;padding:8px 14px;">
     <div class="filter-row">
       <!-- Row 1: Search + result count -->
       <div class="filter-primary">
@@ -758,7 +758,7 @@
 
         <!-- Posted within -->
         <select id="f-posted" class="filter-select">
-          <option value="">Any time</option>
+          <option value="">Posted</option>
           <option value="7">Last 7 days</option>
           <option value="30">Last 30 days</option>
           <option value="90">Last 90 days</option>
@@ -766,15 +766,15 @@
 
         <!-- Sort -->
         <select id="f-sort" class="filter-select">
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="salary-high">Highest salary</option>
-          <option value="salary-low">Lowest salary</option>
+          <option value="newest">Sort: Newest</option>
+          <option value="oldest">Sort: Oldest</option>
+          <option value="salary-high">Sort: Salary ↓</option>
+          <option value="salary-low">Sort: Salary ↑</option>
         </select>
 
         <!-- Min salary filter -->
         <select id="f-min-salary" class="filter-select">
-          <option value="">Any salary</option>
+          <option value="">Salary</option>
           <option value="30000">$30K+</option>
           <option value="50000">$50K+</option>
           <option value="75000">$75K+</option>
