@@ -162,7 +162,9 @@
 
     /* ── Filter toolbar ── */
     #filter-bar { border-bottom: 1px solid var(--border); background: var(--surface); }
-    .filter-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .filter-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .filter-primary { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+    .filter-secondary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     select.filter-select {
       border: 1px solid var(--border); border-radius: var(--radius);
       padding: 5px 26px 5px 10px; font-size: 0.8rem; background: var(--surface);
@@ -455,15 +457,44 @@
       main { padding: 10px !important; }
       #results-panel { border-radius: 4px; }
 
-      /* Filter bar: single scrollable row */
-      #filter-bar > div { padding: 6px 10px !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      #filter-bar .filter-row { flex-wrap: nowrap; gap: 5px; }
-      #filter-bar .filter-row > div:first-child { min-width: 140px; flex: 0 0 140px; }
-      #filter-bar .filter-row::-webkit-scrollbar { display: none; }
+      /* Header: hide clutter, keep essentials */
+      #header-subtitle { display: none; }
+      #meta-bar { display: none; }
+      #btn-view-plans { display: none; }
+
+      /* Filter bar: two-row layout */
+      #filter-bar > div { padding: 7px 10px !important; }
+      #filter-bar .filter-row { flex-direction: column; align-items: stretch; gap: 5px; flex-wrap: nowrap; }
+      .filter-primary { flex: unset; }
+      .filter-secondary {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px;
+        gap: 5px;
+      }
+      .filter-secondary::-webkit-scrollbar { display: none; }
+      .filter-secondary .filter-sep { display: none; }
       #result-count { display: none; }
 
-      /* Header: shorten subtitle */
-      header span:last-child { display: none; }
+      /* Auth/profile modals: full-height on mobile */
+      #auth-overlay, #profile-overlay, #subscribe-overlay,
+      #saved-overlay, #tracker-overlay, #alerts-overlay {
+        align-items: flex-end;
+        padding: 0;
+      }
+      #auth-card {
+        max-width: 100%;
+        border-radius: 16px 16px 0 0;
+        padding: 24px 20px 32px;
+      }
+      .modal-card {
+        max-width: 100%;
+        border-radius: 16px 16px 0 0;
+        top: 0;
+        margin: 0;
+        min-height: 50vh;
+      }
 
       /* Table header: hide */
       #tbl-header { display: none; }
@@ -501,10 +532,18 @@
       /* Row detail: reduce padding */
       .row-detail { padding: 12px 14px 14px; }
 
+      /* CV dropzone: more compact */
+      .cv-dropzone { padding: 14px 16px; }
+      .cv-dropzone > svg { width: 26px !important; height: 26px !important; margin-bottom: 6px !important; }
+
       /* Coach panel: full-width near bottom */
       #coach-panel { width: calc(100vw - 16px); right: 8px; bottom: 70px; }
       #coach-btn   { right: 14px; bottom: 14px; padding: 9px 14px; font-size: 0.8rem; }
       #coach-nudge { right: 14px; bottom: 63px; max-width: 180px; }
+
+      /* Saved/tracker panels: full padding */
+      #saved-panel, #tracker-panel { padding: 14px 12px; }
+      .kanban-board { gap: 8px; }
     }
     /* ── Application Tracker ─────────────────────────────────────── */
     #tracker-panel { max-width: 1100px; margin: 0 auto; padding: 20px; }
@@ -598,7 +637,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;height:48px;gap:16px;">
       <div style="display:flex;align-items:center;gap:10px;">
         <a href="#" onclick="resetAllFilters();return false;" style="font-size:0.95rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;text-decoration:none;">USG Jobs</a>
-        <span style="font-size:0.78rem;color:#64748b;border-left:1px solid #334155;padding-left:10px;margin-left:2px;">University System of Georgia</span>
+        <span id="header-subtitle" style="font-size:0.78rem;color:#64748b;border-left:1px solid #334155;padding-left:10px;margin-left:2px;">University System of Georgia</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
         <div id="meta-bar" style="font-size:0.75rem;color:#64748b;white-space:nowrap;">Loading&hellip;</div>
@@ -642,102 +681,105 @@
 <div id="filter-bar" class="sticky top-0 z-20">
   <div style="max-width:1100px;margin:0 auto;padding:8px 20px;">
     <div class="filter-row">
-      <!-- Search -->
-      <div style="position:relative;flex:1;min-width:180px;">
-        <svg style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-3);pointer-events:none;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-        </svg>
-        <input id="search" type="search" placeholder="Search titles, departments…"
-               list="search-suggestions" autocomplete="off"
-               style="border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px 5px 28px;font-size:0.8rem;width:100%;height:30px;outline:none;font-family:inherit;color:var(--text-1);background:var(--surface);"
-               onfocus="this.style.outlineColor='var(--accent)';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='-1px'"
-               onblur="this.style.outline='none'" />
-        <datalist id="search-suggestions"></datalist>
-      </div>
-
-      <!-- Institution multi-select -->
-      <div class="multiselect">
-        <button class="multiselect-btn" id="ms-inst-btn" type="button">
-          Institution
-          <span class="ms-count hidden" id="ms-inst-count"></span>
-          <svg style="width:10px;height:10px;color:var(--text-3);" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-        </button>
-        <div class="multiselect-panel hidden" id="ms-inst-panel">
-          <div class="ms-search"><input type="text" placeholder="Search institutions…" class="ms-search-input" id="ms-inst-search"></div>
-          <div class="ms-options" id="ms-inst-options"></div>
-          <div class="ms-footer"><button class="ms-clear-btn" id="ms-inst-clear" type="button">Clear all</button></div>
+      <!-- Row 1: Search + CV Match (stays together on mobile) -->
+      <div class="filter-primary">
+        <div style="position:relative;flex:1;min-width:0;">
+          <svg style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-3);pointer-events:none;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input id="search" type="search" placeholder="Search titles, departments…"
+                 list="search-suggestions" autocomplete="off"
+                 style="border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px 5px 28px;font-size:0.8rem;width:100%;height:30px;outline:none;font-family:inherit;color:var(--text-1);background:var(--surface);"
+                 onfocus="this.style.outlineColor='var(--accent)';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='-1px'"
+                 onblur="this.style.outline='none'" />
+          <datalist id="search-suggestions"></datalist>
         </div>
-      </div>
-
-      <!-- Job type -->
-      <select id="f-type" class="filter-select">
-        <option value="">All Types</option>
-        <option value="Full-Time">Full-Time</option>
-        <option value="Part-Time">Part-Time</option>
-      </select>
-
-      <!-- Regular / Temporary -->
-      <select id="f-employment" class="filter-select">
-        <option value="">Regular &amp; Temp</option>
-        <option value="Regular">Regular</option>
-        <option value="Temporary">Temporary</option>
-      </select>
-
-      <!-- Location multi-select -->
-      <div class="multiselect">
-        <button class="multiselect-btn" id="ms-loc-btn" type="button">
-          Location
-          <span class="ms-count hidden" id="ms-loc-count"></span>
-          <svg style="width:10px;height:10px;color:var(--text-3);" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+        <!-- CV Match button -->
+        <button id="btn-cv-toggle" type="button"
+          style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:600;padding:0 12px;height:30px;border-radius:var(--radius);border:none;color:#fff;background:var(--accent);cursor:pointer;white-space:nowrap;font-family:inherit;transition:all 0.12s;flex-shrink:0;">
+          Match my CV/Resume
         </button>
-        <div class="multiselect-panel hidden" id="ms-loc-panel">
-          <div class="ms-search"><input type="text" placeholder="Search locations…" class="ms-search-input" id="ms-loc-search"></div>
-          <div class="ms-options" id="ms-loc-options"></div>
-          <div class="ms-footer"><button class="ms-clear-btn" id="ms-loc-clear" type="button">Clear all</button></div>
-        </div>
       </div>
 
-      <!-- Posted within -->
-      <select id="f-posted" class="filter-select">
-        <option value="">Any time</option>
-        <option value="7">Last 7 days</option>
-        <option value="30">Last 30 days</option>
-        <option value="90">Last 90 days</option>
-      </select>
+      <!-- Row 2: Filter selects (horizontally scrollable on mobile) -->
+      <div class="filter-secondary">
+        <!-- Institution multi-select -->
+        <div class="multiselect">
+          <button class="multiselect-btn" id="ms-inst-btn" type="button">
+            Institution
+            <span class="ms-count hidden" id="ms-inst-count"></span>
+            <svg style="width:10px;height:10px;color:var(--text-3);" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div class="multiselect-panel hidden" id="ms-inst-panel">
+            <div class="ms-search"><input type="text" placeholder="Search institutions…" class="ms-search-input" id="ms-inst-search"></div>
+            <div class="ms-options" id="ms-inst-options"></div>
+            <div class="ms-footer"><button class="ms-clear-btn" id="ms-inst-clear" type="button">Clear all</button></div>
+          </div>
+        </div>
 
-      <!-- Sort -->
-      <select id="f-sort" class="filter-select">
-        <option value="newest">Newest first</option>
-        <option value="oldest">Oldest first</option>
-        <option value="salary-high">Highest salary</option>
-        <option value="salary-low">Lowest salary</option>
-      </select>
+        <!-- Job type -->
+        <select id="f-type" class="filter-select">
+          <option value="">All Types</option>
+          <option value="Full-Time">Full-Time</option>
+          <option value="Part-Time">Part-Time</option>
+        </select>
 
-      <!-- Min salary filter -->
-      <select id="f-min-salary" class="filter-select">
-        <option value="">Any salary</option>
-        <option value="30000">$30K+</option>
-        <option value="50000">$50K+</option>
-        <option value="75000">$75K+</option>
-        <option value="100000">$100K+</option>
-      </select>
+        <!-- Regular / Temporary -->
+        <select id="f-employment" class="filter-select">
+          <option value="">Regular &amp; Temp</option>
+          <option value="Regular">Regular</option>
+          <option value="Temporary">Temporary</option>
+        </select>
 
+        <!-- Location multi-select -->
+        <div class="multiselect">
+          <button class="multiselect-btn" id="ms-loc-btn" type="button">
+            Location
+            <span class="ms-count hidden" id="ms-loc-count"></span>
+            <svg style="width:10px;height:10px;color:var(--text-3);" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div class="multiselect-panel hidden" id="ms-loc-panel">
+            <div class="ms-search"><input type="text" placeholder="Search locations…" class="ms-search-input" id="ms-loc-search"></div>
+            <div class="ms-options" id="ms-loc-options"></div>
+            <div class="ms-footer"><button class="ms-clear-btn" id="ms-loc-clear" type="button">Clear all</button></div>
+          </div>
+        </div>
 
-      <!-- CV Match button -->
-      <button id="btn-cv-toggle" type="button"
-        style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:600;padding:0 12px;height:30px;border-radius:var(--radius);border:none;color:#fff;background:var(--accent);cursor:pointer;white-space:nowrap;font-family:inherit;transition:all 0.12s;">
-        Match my CV/Resume
-      </button>
+        <!-- Posted within -->
+        <select id="f-posted" class="filter-select">
+          <option value="">Any time</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
 
-      <!-- Separator -->
-      <div style="width:1px;height:18px;background:var(--border);flex-shrink:0;"></div>
+        <!-- Sort -->
+        <select id="f-sort" class="filter-select">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="salary-high">Highest salary</option>
+          <option value="salary-low">Lowest salary</option>
+        </select>
 
-      <!-- Clear + count -->
-      <button id="btn-clear" style="font-size:0.78rem;color:var(--accent);background:none;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;padding:0;" class="hidden">
-        Clear
-      </button>
+        <!-- Min salary filter -->
+        <select id="f-min-salary" class="filter-select">
+          <option value="">Any salary</option>
+          <option value="30000">$30K+</option>
+          <option value="50000">$50K+</option>
+          <option value="75000">$75K+</option>
+          <option value="100000">$100K+</option>
+        </select>
 
-      <span id="result-count" style="font-size:0.78rem;color:var(--text-2);font-weight:500;margin-left:auto;white-space:nowrap;"></span>
+        <!-- Separator -->
+        <div class="filter-sep" style="width:1px;height:18px;background:var(--border);flex-shrink:0;"></div>
+
+        <!-- Clear + count -->
+        <button id="btn-clear" style="font-size:0.78rem;color:var(--accent);background:none;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;padding:0;" class="hidden">
+          Clear
+        </button>
+
+        <span id="result-count" style="font-size:0.78rem;color:var(--text-2);font-weight:500;white-space:nowrap;"></span>
+      </div>
     </div>
   </div>
 </div>
