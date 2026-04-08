@@ -139,14 +139,14 @@
   <div class="dash-sub" id="dash-sub">Live data from all USG institutions</div>
   <div class="data-note">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-    Showing positions posted within the last 6 months — older listings are likely filled even if still on institution websites.
+    Some older listings may already be filled even if still on institution websites. Count matches the main job board.
   </div>
 
   <!-- Stat cards -->
   <div class="stat-row">
     <div class="stat-card">
       <div class="stat-value" id="s-total">–</div>
-      <div class="stat-label">Open positions (6 mo.)</div>
+      <div class="stat-label">Total open positions</div>
     </div>
     <div class="stat-card">
       <div class="stat-value" id="s-inst">–</div>
@@ -308,18 +308,12 @@ async function init() {
   const data = await res.json();
   const meta = data.meta || {};
 
-  // ── Filter to last 6 months for relevance ────────────────────────────────
-  const cutoff = new Date();
-  cutoff.setMonth(cutoff.getMonth() - 6);
-  const allJobs = data.jobs || [];
-  const jobs = allJobs.filter(j => {
-    if (!j.posted) return true; // keep if no date (don't accidentally drop everything)
-    return new Date(j.posted) >= cutoff;
-  });
+  // Use all jobs to match main site count exactly
+  const jobs = data.jobs || [];
 
   const lastUpdated = meta.last_updated ? ` · Updated ${meta.last_updated}` : '';
   document.getElementById('dash-sub').textContent =
-    `${jobs.length.toLocaleString()} positions (last 6 months)${lastUpdated}`;
+    `${jobs.length.toLocaleString()} open positions${lastUpdated}`;
 
   buildStats(jobs);
   buildBreakdownTables(jobs);
