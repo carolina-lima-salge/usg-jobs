@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Job Market Analytics – USG Jobs</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --header-bg:#0f172a; --accent:#2563eb; --accent-dark:#1d4ed8;
+    --surface:#ffffff; --bg:#f8fafc; --border:#e2e8f0;
+    --text-1:#1e293b; --text-2:#475569; --text-3:#94a3b8;
+    --radius:6px; --shadow:0 1px 4px rgba(0,0,0,0.08);
+    --shadow-md:0 4px 16px rgba(0,0,0,0.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text-1);min-height:100vh;}
+
+  /* Header */
+  header{background:var(--header-bg);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;}
+  .logo{color:#fff;font-weight:700;font-size:1rem;text-decoration:none;display:flex;align-items:center;gap:8px;}
+  .logo span{background:var(--accent);color:#fff;font-size:0.72rem;font-weight:700;padding:2px 7px;border-radius:4px;}
+  .header-right{display:flex;align-items:center;gap:12px;}
+  .back-btn{color:#cbd5e1;font-size:0.8rem;text-decoration:none;display:flex;align-items:center;gap:4px;}
+  .back-btn:hover{color:#fff;}
+  .pro-badge{background:#7c3aed;color:#fff;font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:0.03em;}
+
+  /* Gate */
+  #gate{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px 20px;}
+  #gate h2{font-size:1.4rem;margin-bottom:10px;}
+  #gate p{color:var(--text-2);margin-bottom:24px;max-width:380px;line-height:1.5;}
+  .btn-primary{background:var(--accent);color:#fff;border:none;padding:10px 24px;border-radius:var(--radius);font-weight:600;font-size:0.9rem;cursor:pointer;text-decoration:none;display:inline-block;}
+  .btn-primary:hover{background:var(--accent-dark);}
+
+  /* Loading */
+  #loading-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:14px;color:var(--text-2);}
+  .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Dashboard */
+  #dashboard{display:none;padding:28px 24px;max-width:1300px;margin:0 auto;}
+  .dash-title{font-size:1.35rem;font-weight:700;margin-bottom:4px;}
+  .dash-sub{color:var(--text-2);font-size:0.85rem;margin-bottom:28px;}
+
+  /* Stat cards */
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:28px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 20px;box-shadow:var(--shadow);}
+  .stat-value{font-size:1.9rem;font-weight:700;color:var(--accent);line-height:1;}
+  .stat-label{font-size:0.75rem;color:var(--text-2);margin-top:6px;font-weight:500;}
+
+  /* Chart grid */
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+  .chart-grid.thirds{grid-template-columns:1fr 1fr 1fr;}
+  .chart-grid.full{grid-template-columns:1fr;}
+  @media(max-width:900px){.chart-grid,.chart-grid.thirds{grid-template-columns:1fr;}}
+
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 22px;box-shadow:var(--shadow);}
+  .chart-title{font-size:0.88rem;font-weight:700;color:var(--text-1);margin-bottom:4px;}
+  .chart-sub{font-size:0.73rem;color:var(--text-3);margin-bottom:16px;}
+  .chart-wrap{position:relative;}
+
+  /* Wordcloud */
+  #wordcloud{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 0;line-height:1.6;}
+  .wc-word{cursor:default;transition:opacity 0.15s;border-radius:3px;padding:1px 3px;}
+  .wc-word:hover{opacity:0.7;}
+
+  /* Closing soon table */
+  .close-table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+  .close-table th{text-align:left;padding:7px 10px;font-size:0.72rem;color:var(--text-3);font-weight:600;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.04em;}
+  .close-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  .close-table tr:last-child td{border-bottom:none;}
+  .close-table a{color:var(--accent);text-decoration:none;font-weight:500;}
+  .close-table a:hover{text-decoration:underline;}
+  .days-left{display:inline-block;padding:2px 7px;border-radius:10px;font-size:0.7rem;font-weight:600;}
+  .days-urgent{background:#fee2e2;color:#b91c1c;}
+  .days-warn{background:#fef9c3;color:#854d0e;}
+  .days-ok{background:#f0fdf4;color:#166534;}
+
+  /* Section label */
+  .section-label{font-size:0.78rem;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:28px 0 14px;}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html">USG <span>JOBS</span></a>
+  <div class="header-right">
+    <span class="pro-badge">PRO</span>
+    <a class="back-btn" href="index.html">← Back to listings</a>
+  </div>
+</header>
+
+<div id="loading-state">
+  <div class="spinner"></div>
+  <div>Loading analytics…</div>
+</div>
+
+<div id="gate">
+  <h2>📊 Pro Analytics</h2>
+  <p>The analytics dashboard is available to Pro subscribers. Upgrade to unlock salary trends, hiring velocity, institution breakdowns, and more.</p>
+  <a class="btn-primary" href="index.html">View Plans</a>
+</div>
+
+<div id="dashboard">
+  <div class="dash-title">📊 USG Job Market Analytics</div>
+  <div class="dash-sub" id="dash-sub">Live data from all USG institutions</div>
+
+  <!-- Stat cards -->
+  <div class="stat-row">
+    <div class="stat-card"><div class="stat-value" id="s-total">–</div><div class="stat-label">Total open positions</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-inst">–</div><div class="stat-label">Institutions hiring</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-fulltime">–</div><div class="stat-label">Full-time roles</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-faculty">–</div><div class="stat-label">Faculty positions</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-salary">–</div><div class="stat-label">Avg posted salary</div></div>
+    <div class="stat-card"><div class="stat-value" id="s-new">–</div><div class="stat-label">Posted this week</div></div>
+  </div>
+
+  <div class="section-label">Supply &amp; Demand</div>
+  <div class="chart-grid">
+    <div class="chart-card" style="grid-column:span 2;">
+      <div class="chart-title">Open Positions by Institution</div>
+      <div class="chart-sub">Top 15 USG institutions by number of current openings</div>
+      <div class="chart-wrap"><canvas id="chart-inst" height="280"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-grid thirds">
+    <div class="chart-card">
+      <div class="chart-title">Job Type</div>
+      <div class="chart-sub">Full-time vs part-time breakdown</div>
+      <div class="chart-wrap"><canvas id="chart-type" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Employment Type</div>
+      <div class="chart-sub">Regular vs temporary positions</div>
+      <div class="chart-wrap"><canvas id="chart-emp" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Role Categories</div>
+      <div class="chart-sub">Positions by broad function</div>
+      <div class="chart-wrap"><canvas id="chart-cat" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-grid full">
+    <div class="chart-card">
+      <div class="chart-title">New Postings Over Time</div>
+      <div class="chart-sub">Number of jobs posted each month (last 12 months)</div>
+      <div class="chart-wrap"><canvas id="chart-time" height="110"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-label">Salary Intelligence</div>
+  <div class="chart-grid full">
+    <div class="chart-card">
+      <div class="chart-title">Salary Ranges by Institution</div>
+      <div class="chart-sub">Average advertised salary for institutions with 5+ salary data points</div>
+      <div class="chart-wrap"><canvas id="chart-sal-inst" height="220"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-grid full">
+    <div class="chart-card">
+      <div class="chart-title">Salary Distribution by Role Category</div>
+      <div class="chart-sub">Average salary across Faculty, Administrative, Research, IT, and Student Services roles</div>
+      <div class="chart-wrap"><canvas id="chart-sal-cat" height="100"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-label">Content &amp; Trends</div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Frequent Terms in Job Descriptions</div>
+      <div class="chart-sub">Most common keywords across all postings — bigger = more frequent</div>
+      <div id="wordcloud"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Top Departments Hiring</div>
+      <div class="chart-sub">Departments with the most open positions</div>
+      <div class="chart-wrap"><canvas id="chart-dept" height="260"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-label">Closing Soon</div>
+  <div class="chart-card">
+    <div class="chart-title">Positions Closing in the Next 30 Days</div>
+    <div class="chart-sub">Apply before these deadlines</div>
+    <div style="overflow-x:auto;margin-top:12px;">
+      <table class="close-table" id="table-closing">
+        <thead><tr><th>Position</th><th>Institution</th><th>Closes</th><th>Days left</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="height:40px;"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://wktobsxgcpcjuahtmgxa.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdG9ic3hnY3BjanVhaHRtZ3hhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwODgxNjYsImV4cCI6MjA5MDY2NDE2Nn0.Q85SNREYpWKK4Kq_t14SSaJvI3X06VVkzixipqhAiyg';
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Auth gate ─────────────────────────────────────────────────────────────────
+async function checkAccess() {
+  const { data: { session } } = await _sb.auth.getSession();
+  if (!session) return false;
+  const { data: profile } = await _sb.from('profiles').select('subscription_status,subscription_tier').eq('id', session.user.id).maybeSingle();
+  const tier = profile?.subscription_tier || '';
+  const status = profile?.subscription_status || '';
+  // Pro or basic (treated as pro under 2-tier system)
+  return status === 'active' && (tier === 'pro' || tier === 'basic');
+}
+
+// ── Colour palettes ───────────────────────────────────────────────────────────
+const BLUES  = ['#1d4ed8','#2563eb','#3b82f6','#60a5fa','#93c5fd','#bfdbfe','#dbeafe'];
+const MULTI  = ['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#65a30d','#9333ea','#0f766e'];
+
+// ── Salary parser ─────────────────────────────────────────────────────────────
+function parseSalary(s) {
+  if (!s) return null;
+  const nums = [];
+  (s.match(/[\d,]+(?:\.\d+)?/g) || []).forEach(n => {
+    const v = parseFloat(n.replace(/,/g,''));
+    if (v > 10000 && v < 500000) nums.push(v);
+  });
+  if (!nums.length) return null;
+  return nums.reduce((a,b)=>a+b,0)/nums.length; // avg of range endpoints
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+async function init() {
+  const hasAccess = await checkAccess();
+  document.getElementById('loading-state').style.display = 'none';
+  if (!hasAccess) {
+    document.getElementById('gate').style.display = 'flex';
+    return;
+  }
+
+  document.getElementById('dashboard').style.display = 'block';
+
+  // Load jobs
+  const res = await fetch('jobs.json');
+  const data = await res.json();
+  const jobs = data.jobs || [];
+  const meta = data.meta || {};
+  document.getElementById('dash-sub').textContent =
+    `${jobs.length.toLocaleString()} open positions · Updated ${meta.last_updated || 'recently'}`;
+
+  buildStats(jobs);
+  buildInstChart(jobs);
+  buildTypeCharts(jobs);
+  buildTimeChart(jobs);
+  buildSalaryCharts(jobs);
+  buildWordcloud(jobs);
+  buildDeptChart(jobs);
+  buildClosingTable(jobs);
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function buildStats(jobs) {
+  const institutions = new Set(jobs.map(j=>j.institution).filter(Boolean));
+  const fulltime = jobs.filter(j=>j.type==='Full-Time').length;
+  const faculty  = jobs.filter(j=>{const t=(j.title||'').toLowerCase();return /professor|faculty|lecturer|instructor/.test(t);}).length;
+
+  const salaries = jobs.map(j=>parseSalary(j.salary)).filter(Boolean);
+  const avgSal   = salaries.length ? salaries.reduce((a,b)=>a+b,0)/salaries.length : 0;
+
+  const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate()-7);
+  const newJobs = jobs.filter(j=>{
+    if (!j.posted) return false;
+    return new Date(j.posted) >= oneWeekAgo;
+  }).length;
+
+  document.getElementById('s-total').textContent    = jobs.length.toLocaleString();
+  document.getElementById('s-inst').textContent     = institutions.size;
+  document.getElementById('s-fulltime').textContent = fulltime.toLocaleString();
+  document.getElementById('s-faculty').textContent  = faculty.toLocaleString();
+  document.getElementById('s-salary').textContent   = avgSal ? '$'+Math.round(avgSal/1000)+'K' : '–';
+  document.getElementById('s-new').textContent      = newJobs.toLocaleString();
+}
+
+// ── Institution bar chart ─────────────────────────────────────────────────────
+function buildInstChart(jobs) {
+  const counts = {};
+  jobs.forEach(j=>{ if(j.institution) counts[j.institution]=(counts[j.institution]||0)+1; });
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const labels = sorted.map(([k])=>k.replace('University of ','U of ').replace('Georgia Institute of Technology','GA Tech').replace(' University','  U.'));
+  new Chart(document.getElementById('chart-inst'),{
+    type:'bar',
+    data:{ labels, datasets:[{ data:sorted.map(([,v])=>v), backgroundColor:BLUES[1], borderRadius:4 }] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:11}}}}, maintainAspectRatio:false }
+  });
+  document.getElementById('chart-inst').parentElement.style.height='320px';
+}
+
+// ── Type & employment donuts ──────────────────────────────────────────────────
+function buildTypeCharts(jobs) {
+  // Job type
+  const typeCounts = {}, empCounts = {};
+  jobs.forEach(j=>{
+    const t = j.type||'Unknown';
+    typeCounts[t] = (typeCounts[t]||0)+1;
+    const e = j.employment||'Unknown';
+    empCounts[e] = (empCounts[e]||0)+1;
+  });
+  [['chart-type',typeCounts],['chart-emp',empCounts]].forEach(([id,c])=>{
+    const entries = Object.entries(c).sort((a,b)=>b[1]-a[1]);
+    new Chart(document.getElementById(id),{
+      type:'doughnut',
+      data:{ labels:entries.map(([k])=>k), datasets:[{ data:entries.map(([,v])=>v), backgroundColor:MULTI, borderWidth:2, borderColor:'#fff' }] },
+      options:{ plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12,padding:10}}}, maintainAspectRatio:false }
+    });
+  });
+
+  // Role categories
+  const cats = {
+    'Faculty/Professor': 0, 'Student Services': 0, 'Administrative': 0,
+    'Research': 0, 'IT/Tech': 0, 'Other': 0
+  };
+  jobs.forEach(j=>{
+    const t=(j.title||'').toLowerCase();
+    if (/professor|faculty|lecturer|instructor/.test(t)) cats['Faculty/Professor']++;
+    else if (/advisor|counselor|student|recruiter/.test(t)) cats['Student Services']++;
+    else if (/coordinator|administrator|manager|director|officer/.test(t)) cats['Administrative']++;
+    else if (/research|scientist|analyst/.test(t)) cats['Research']++;
+    else if (/engineer|developer|\bit\b|technician|programmer|software/.test(t)) cats['IT/Tech']++;
+    else cats['Other']++;
+  });
+  const catEntries = Object.entries(cats).filter(([,v])=>v>0);
+  new Chart(document.getElementById('chart-cat'),{
+    type:'doughnut',
+    data:{ labels:catEntries.map(([k])=>k), datasets:[{ data:catEntries.map(([,v])=>v), backgroundColor:MULTI, borderWidth:2, borderColor:'#fff' }] },
+    options:{ plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12,padding:8}}}, maintainAspectRatio:false }
+  });
+}
+
+// ── Time series ───────────────────────────────────────────────────────────────
+function buildTimeChart(jobs) {
+  const now = new Date();
+  const months = {};
+  for (let i=11;i>=0;i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    months[key] = 0;
+  }
+  jobs.forEach(j=>{
+    if (!j.posted) return;
+    const key = j.posted.slice(0,7);
+    if (key in months) months[key]++;
+  });
+  const labels = Object.keys(months).map(k=>{ const [y,m]=k.split('-'); return new Date(+y,+m-1,1).toLocaleString('default',{month:'short',year:'2-digit'}); });
+  new Chart(document.getElementById('chart-time'),{
+    type:'line',
+    data:{ labels, datasets:[{ data:Object.values(months), borderColor:BLUES[1], backgroundColor:'rgba(37,99,235,0.08)', tension:0.35, fill:true, pointRadius:3, pointBackgroundColor:BLUES[1] }] },
+    options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}, maintainAspectRatio:false }
+  });
+}
+
+// ── Salary charts ─────────────────────────────────────────────────────────────
+function buildSalaryCharts(jobs) {
+  // By institution
+  const instSal = {};
+  jobs.forEach(j=>{
+    const sal = parseSalary(j.salary);
+    if (!sal || !j.institution) return;
+    if (!instSal[j.institution]) instSal[j.institution] = [];
+    instSal[j.institution].push(sal);
+  });
+  const instAvg = Object.entries(instSal)
+    .filter(([,arr])=>arr.length>=5)
+    .map(([k,arr])=>([k, arr.reduce((a,b)=>a+b,0)/arr.length]))
+    .sort((a,b)=>b[1]-a[1]);
+
+  if (instAvg.length) {
+    const labels = instAvg.map(([k])=>k.replace('University of ','U of ').replace('Georgia Institute of Technology','GA Tech'));
+    new Chart(document.getElementById('chart-sal-inst'),{
+      type:'bar',
+      data:{ labels, datasets:[{ label:'Avg salary', data:instAvg.map(([,v])=>Math.round(v)), backgroundColor:BLUES[2], borderRadius:4 }] },
+      options:{
+        indexAxis:'y',
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'$'+ctx.raw.toLocaleString()}}},
+        scales:{x:{ticks:{callback:v=>'$'+Math.round(v/1000)+'K'},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:11}}}},
+        maintainAspectRatio:false
+      }
+    });
+    document.getElementById('chart-sal-inst').parentElement.style.height = (instAvg.length*30+40)+'px';
+  }
+
+  // By category
+  const catSal = { 'Faculty/Professor':[], 'Student Services':[], 'Administrative':[], 'Research':[], 'IT/Tech':[] };
+  jobs.forEach(j=>{
+    const sal = parseSalary(j.salary);
+    if (!sal) return;
+    const t=(j.title||'').toLowerCase();
+    if (/professor|faculty|lecturer|instructor/.test(t)) catSal['Faculty/Professor'].push(sal);
+    else if (/advisor|counselor|student|recruiter/.test(t)) catSal['Student Services'].push(sal);
+    else if (/coordinator|administrator|manager|director|officer/.test(t)) catSal['Administrative'].push(sal);
+    else if (/research|scientist|analyst/.test(t)) catSal['Research'].push(sal);
+    else if (/engineer|developer|\bit\b|technician|programmer|software/.test(t)) catSal['IT/Tech'].push(sal);
+  });
+  const catEntries = Object.entries(catSal).filter(([,arr])=>arr.length>0);
+  new Chart(document.getElementById('chart-sal-cat'),{
+    type:'bar',
+    data:{
+      labels: catEntries.map(([k])=>k),
+      datasets:[{ label:'Avg salary', data:catEntries.map(([,arr])=>Math.round(arr.reduce((a,b)=>a+b,0)/arr.length)), backgroundColor:MULTI, borderRadius:4 }]
+    },
+    options:{
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'$'+ctx.raw.toLocaleString()}}},
+      scales:{y:{ticks:{callback:v=>'$'+Math.round(v/1000)+'K'},beginAtZero:true,grid:{color:'#f1f5f9'}},x:{grid:{display:false}}},
+      maintainAspectRatio:false
+    }
+  });
+}
+
+// ── Wordcloud ─────────────────────────────────────────────────────────────────
+function buildWordcloud(jobs) {
+  const stop = new Set('a an the and or but in on at to for of with by from as is was are were be been being have has had do does did will would could should may might this that these those it its they their we our you your i my he she him her his us them who which what when where why how all any each few more most other some such no nor not only own same so than too very just about also both during even into many now over since still then through until up use used using via well while yet per new good great work works working get gets one two three four five will also must required must including related related strong'.split(' '));
+  const freq = {};
+  jobs.forEach(j=>{
+    const text = ((j.summary||'') + ' ' + (j.title||'')).toLowerCase();
+    (text.match(/[a-z]{4,}/g)||[]).forEach(w=>{ if (!stop.has(w)) freq[w]=(freq[w]||0)+1; });
+  });
+  const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,60);
+  const max = top[0][1], min = top[top.length-1][1];
+  const colors = ['#1d4ed8','#2563eb','#3b82f6','#7c3aed','#059669','#d97706','#0891b2','#be185d'];
+  const wc = document.getElementById('wordcloud');
+  top.forEach(([word,count],i)=>{
+    const pct = (count-min)/(max-min||1);
+    const size = 0.72 + pct * 1.5; // 0.72rem to 2.22rem
+    const span = document.createElement('span');
+    span.className='wc-word';
+    span.textContent=word;
+    span.title=`${count} occurrences`;
+    span.style.fontSize=size+'rem';
+    span.style.fontWeight=pct>0.5?'700':'500';
+    span.style.color=colors[i%colors.length];
+    span.style.opacity=(0.55+pct*0.45).toFixed(2);
+    wc.appendChild(span);
+  });
+}
+
+// ── Department chart ──────────────────────────────────────────────────────────
+function buildDeptChart(jobs) {
+  const counts = {};
+  jobs.forEach(j=>{ if(j.department){ const d=j.department.replace(/^[A-Z&]{2,}-/,''); counts[d]=(counts[d]||0)+1; } });
+  const top20 = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  new Chart(document.getElementById('chart-dept'),{
+    type:'bar',
+    data:{ labels:top20.map(([k])=>k.length>28?k.slice(0,26)+'…':k), datasets:[{ data:top20.map(([,v])=>v), backgroundColor:BLUES[2], borderRadius:3 }] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:10}}}}, maintainAspectRatio:false }
+  });
+  document.getElementById('chart-dept').parentElement.style.height='440px';
+}
+
+// ── Closing soon table ────────────────────────────────────────────────────────
+function buildClosingTable(jobs) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const soon = jobs
+    .filter(j=>j.closes)
+    .map(j=>{ const d=new Date(j.closes); const days=Math.round((d-today)/(1000*60*60*24)); return {...j,_days:days,_closeDate:d}; })
+    .filter(j=>j._days>=0 && j._days<=30)
+    .sort((a,b)=>a._days-b._days)
+    .slice(0,25);
+
+  const tbody = document.querySelector('#table-closing tbody');
+  if (!soon.length) { tbody.innerHTML='<tr><td colspan="4" style="color:var(--text-3);padding:16px 10px;">No closing dates found in the data.</td></tr>'; return; }
+  soon.forEach(j=>{
+    const cls = j._days<=5?'days-urgent':j._days<=14?'days-warn':'days-ok';
+    const label = j._days===0?'Today':j._days===1?'Tomorrow':`${j._days} days`;
+    const url = j.view||j.apply||'#';
+    tbody.innerHTML+=`<tr>
+      <td><a href="${url}" target="_blank">${j.title||'Untitled'}</a></td>
+      <td style="color:var(--text-2)">${j.institution||'—'}</td>
+      <td style="color:var(--text-2);white-space:nowrap">${j._closeDate.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</td>
+      <td><span class="days-left ${cls}">${label}</span></td>
+    </tr>`;
+  });
+}
+
+init();
+</script>
+</body>
+</html>
