@@ -2742,6 +2742,7 @@ _sb.auth.onAuthStateChange(async (event, session) => {
   } else {
     savedJobIds.clear();
     userProfile = null;
+    _saveProCache(null, false); // clear pro cache on sign-out
     refreshSaveButtons();
     freeSampleSet = null;  // reset sample so a new one is drawn for anonymous visitors
     updateFreeSample();
@@ -2749,24 +2750,26 @@ _sb.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
-// ── Analytics button fallback ─────────────────────────────────────────────────
-// If the auth event fired but loadProfile completed with null/pending, retry once
-// after the page has fully settled. This catches bfcache restores and slow networks.
-function _syncAnalyticsBtn() {
-  const btn = document.getElementById('umenu-analytics');
-  if (!btn || !currentUser) return;
-  const tier = getUserTier();
-  if (tier === 'pending') return; // still loading — nothing to do yet
-  btn.style.display = tier === 'pro' ? '' : 'none';
+// ── Pro-status cache ──────────────────────────────────────────────────────────
+// Store pro status in localStorage so the analytics button appears instantly on
+// every page load/navigation without waiting for Supabase to respond.
+const _PRO_KEY = 'usg_pro_uid'; // value = user id when pro; absent = not pro
+
+function _saveProCache(uid, isPro) {
+  try {
+    if (isPro && uid) localStorage.setItem(_PRO_KEY, uid);
+    else             localStorage.removeItem(_PRO_KEY);
+  } catch(e) {}
 }
-setTimeout(async () => {
-  if (!currentUser) return;
-  if (getUserTier() === 'pending') {
-    // Profile didn't load via the auth event — try once more
-    try { await loadProfile(); } catch(e) {}
-  }
-  _syncAnalyticsBtn();
-}, 1500);
+function _isProCached() {
+  try { return !!localStorage.getItem(_PRO_KEY); } catch(e) { return false; }
+}
+
+// Apply the cache immediately so the analytics button shows before loadProfile finishes
+(function _applyProCache() {
+  const btn = document.getElementById('umenu-analytics');
+  if (btn && _isProCached()) btn.style.display = '';
+})();
 
 // ── Header UI ─────────────────────────────────────────────────────────────────
 function updateHeaderUI() {
@@ -3080,12 +3083,14 @@ async function loadProfile() {
     ));
   } catch(e) { console.warn('Profile fetch error:', e); }
   userProfile = data;
+  // Persist pro status so analytics button shows instantly on next page load
+  const isPro = getUserTier() === 'pro';
+  _saveProCache(currentUser?.id, isPro);
   // Refresh header label now that we have the full name
   updateHeaderUI();
-  // Show "Upgrade" for free users; hide for Pro (getUserTier maps 'basic' → 'pro')
+  // Show "Upgrade" for free users; hide for Pro
   const subBtn = document.getElementById('umenu-subscribe');
   const analyticsBtn = document.getElementById('umenu-analytics');
-  const isPro = getUserTier() === 'pro';
   if (subBtn) subBtn.style.display = isPro ? 'none' : '';
   if (analyticsBtn) analyticsBtn.style.display = isPro ? '' : 'none';
   const plansBtn = document.getElementById('btn-view-plans');
@@ -3205,9 +3210,8 @@ let _selectedTier = 'basic'; // 'free' | 'basic' | 'pro'
 
 function getUserTier() {
   if (!currentUser) return 'free';
-  // undefined = fetch not started/completed yet; null = fetch returned no row (treat as pending too
-  // so a transient network failure doesn't permanently downgrade a Pro user to free)
-  if (userProfile === undefined || userProfile === null) return 'pending';
+  if (userProfile === undefined) return 'pending'; // still loading
+  // null means Supabase returned no profile row → free tier
   if (userProfile?.subscription_status === 'active') {
     // 'basic' is treated as 'pro' under the new 2-tier system
     const t = userProfile?.subscription_tier || 'pro';
