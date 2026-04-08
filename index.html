@@ -2245,15 +2245,7 @@ function clearCVMatch() {
 
 // ── CV UI events ────────────────────────────────────────────────────────────────
 document.getElementById('btn-cv-toggle').addEventListener('click', async () => {
-  let tier = getUserTier();
-  // If profile is still loading wait up to 6 s then re-check
-  if (tier === 'pending') {
-    for (let i = 0; i < 12 && getUserTier() === 'pending'; i++) {
-      await new Promise(r => setTimeout(r, 500));
-    }
-    tier = getUserTier();
-  }
-  if (tier === 'pending') return; // still not resolved — give up
+  let tier = await resolvedTier();
   if (tier !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
   if (matchMode) { clearCVMatch(); return; } // CV loaded — clicking removes it
   const panel = document.getElementById('cv-panel');
@@ -2328,9 +2320,8 @@ let coachHistory  = [];   // [{role,content}, ...]
 let coachReady    = false;
 let coachState    = 'closed'; // 'closed' | 'open' | 'minimized'
 
-function toggleCoach() {
-  const tier = getUserTier();
-  if (tier === 'pending') return; // profile still loading — ignore click
+async function toggleCoach() {
+  const tier = await resolvedTier();
   if (tier !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
   if (coachState === 'closed' || coachState === 'minimized') openCoach();
   else minimizeCoach();
@@ -2759,8 +2750,10 @@ _sb.auth.onAuthStateChange(async (event, session) => {
     return;
   }
 
-  // First load for this user — fetch profile
-  userProfile = undefined; // pending
+  // First load for this user — apply cache immediately so tier is known right away,
+  // then fetch fresh data from Supabase in the background.
+  const _cached = _loadProfileCache(currentUser.id);
+  userProfile = _cached || undefined; // known instantly if cached, else pending
   updateHeaderUI();
   if (allJobs.length > 0) applyFilters();
   await loadSavedJobIds();
@@ -3106,7 +3099,7 @@ async function loadProfile() {
   try {
     ({ data, error: fetchError } = await sbQuery(
       _sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(),
-      10000, null
+      5000, null
     ));
   } catch(e) { console.warn('Profile fetch error:', e); fetchError = e; }
 
@@ -3247,6 +3240,23 @@ function getUserTier() {
   return 'free';
 }
 
+// Like getUserTier() but resolves pending instantly from cache, or waits max 300 ms.
+// Never blocks for 6 seconds — buttons feel immediate.
+async function resolvedTier() {
+  let tier = getUserTier();
+  if (tier !== 'pending') return tier;
+  // Try to resolve from cache right now (currentUser is set, cache might exist)
+  if (currentUser) {
+    const cached = _loadProfileCache(currentUser.id);
+    if (cached) { userProfile = cached; return getUserTier(); }
+  }
+  // Last resort: wait up to 300 ms for the in-flight loadProfile() to finish
+  await new Promise(r => setTimeout(r, 300));
+  tier = getUserTier();
+  // If still pending after 300ms, treat as free (subscribe page is the safe default)
+  return tier === 'pending' ? 'free' : tier;
+}
+
 function selectTier(tier) {
   _selectedTier = tier;
   document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('tier-selected'));
@@ -3266,19 +3276,9 @@ function selectTier(tier) {
 
 async function openAnalytics() {
   document.getElementById('user-menu-panel').classList.add('hidden');
-  let tier = getUserTier();
-  // If profile is still loading, wait up to 6 s then re-check (same pattern as CV button)
-  if (tier === 'pending') {
-    for (let i = 0; i < 12 && getUserTier() === 'pending'; i++) {
-      await new Promise(r => setTimeout(r, 500));
-    }
-    tier = getUserTier();
-  }
-  if (tier === 'pro') {
-    window.open('analytics.html', '_blank');
-  } else {
-    showSubscribePage();
-  }
+  const tier = await resolvedTier();
+  if (tier === 'pro') window.open('analytics.html', '_blank');
+  else showSubscribePage();
 }
 
 function showSubscribePage() {
