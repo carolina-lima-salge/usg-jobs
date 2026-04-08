@@ -735,6 +735,7 @@
           <option value="">Regular &amp; Temp</option>
           <option value="Regular">Regular</option>
           <option value="Temporary">Temporary</option>
+          <option value="__none__">Not included</option>
         </select>
 
         <!-- Location multi-select -->
@@ -1355,9 +1356,11 @@ function applyFilters() {
 
     if (employment) {
       const em = (job.employment || '').toLowerCase();
-      // Only exclude if the job explicitly has a *different* employment type.
-      // Jobs with no employment data (e.g. UGA, GSU) are not excluded.
-      if (em && !em.includes(employment)) return false;
+      if (employment === '__none__') {
+        if (em) return false;                      // has data → exclude
+      } else {
+        if (!em || !em.includes(employment)) return false; // wrong or missing → exclude
+      }
     }
 
     if (selectedLocs.size > 0 && !selectedLocs.has(job.location)) return false;
