@@ -2737,14 +2737,22 @@ _sb.auth.onAuthStateChange(async (event, session) => {
     openAuthModal('newpassword');
     return;
   }
+
+  // TOKEN_REFRESHED fires whenever the JWT is silently renewed — including when
+  // any other tab (e.g. analytics.html) calls getSession().  The user hasn't
+  // changed, so just update currentUser and bail out; resetting userProfile here
+  // would cause a false "free user" flash every time the analytics tab opens/closes.
+  if (event === 'TOKEN_REFRESHED') {
+    currentUser = session?.user ?? null;
+    return;
+  }
+
   currentUser = session?.user ?? null;
   // Set userProfile to undefined (pending) BEFORE updateHeaderUI so that getUserTier()
   // returns 'pending' rather than 'free' during the gap between SIGNED_OUT and loadProfile.
   if (currentUser) userProfile = undefined;
   updateHeaderUI();
   if (currentUser) {
-    // userProfile already set to undefined above
-    // Re-render immediately so the banner hides while the profile loads
     if (allJobs.length > 0) applyFilters();
     await loadSavedJobIds();
     await loadProfile();
@@ -2753,7 +2761,7 @@ _sb.auth.onAuthStateChange(async (event, session) => {
     savedJobIds.clear();
     userProfile = null;
     refreshSaveButtons();
-    freeSampleSet = null;  // reset sample so a new one is drawn for anonymous visitors
+    freeSampleSet = null;
     updateFreeSample();
     if (allJobs.length > 0) applyFilters();
   }
