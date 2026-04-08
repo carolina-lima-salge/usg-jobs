@@ -1662,7 +1662,7 @@ async function openStarPrep(jobId, event) {
     return;
   }
 
-  // No CV yet — show compact inline upload zone
+  // No CV yet — show inline upload zone with drag-and-drop support
   content.innerHTML = `
     <div style="padding:16px 0;">
       <p style="font-size:0.84rem;color:var(--text-2);margin-bottom:14px;text-align:center;">
@@ -1671,22 +1671,19 @@ async function openStarPrep(jobId, event) {
       <label for="star-cv-input" id="star-dz"
         style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
                border:2px dashed var(--border);border-radius:8px;padding:28px 20px;cursor:pointer;
-               background:var(--bg-2);transition:border-color .15s;"
-        onmouseover="this.style.borderColor='var(--accent)'"
-        onmouseout="this.style.borderColor='var(--border)'">
+               background:var(--bg-2);transition:border-color .15s,background .15s;">
         <svg style="width:32px;height:32px;color:var(--accent);opacity:.7;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
-        <span style="font-size:0.82rem;font-weight:500;color:var(--text-1);">Click to upload your CV/Resume</span>
+        <span style="font-size:0.82rem;font-weight:500;color:var(--text-1);">Click or drag &amp; drop your CV/Resume</span>
         <span style="font-size:0.72rem;color:var(--text-3);">PDF, DOCX, or TXT — processed in your browser</span>
       </label>
       <input type="file" id="star-cv-input" accept=".pdf,.docx,.txt" style="display:none;">
       <div id="star-cv-error" style="display:none;margin-top:8px;font-size:0.78rem;color:#991b1b;text-align:center;"></div>
     </div>`;
 
-  document.getElementById('star-cv-input').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
+  async function _processStarFile(file) {
     if (!file) return;
     content.innerHTML = '<p style="text-align:center;color:var(--text-3);padding:30px 0;font-size:0.85rem;">📄 Reading your CV…</p>';
     try {
@@ -1698,19 +1695,39 @@ async function openStarPrep(jobId, event) {
       else                     text = new TextDecoder().decode(ab);
       if (text.trim().length < 20) throw new Error('Could not read text from this file.');
 
-      // Set global CV and kick off background job matching so the filter bar also updates
       cvTextGlobal = text;
       try { localStorage.setItem('usg_cv_text', text); } catch(_) {}
-      // Run matching async in background — don't block STAR generation
       if (embLoaded) runSemanticMatching(text).catch(() => runTFIDFMatching(text));
       else           runTFIDFMatching(text);
       setCVActiveButton();
-
-      // Now generate STAR points with the freshly parsed CV
       await _runStarGeneration(job, text, content);
     } catch (err) {
       content.innerHTML = `<div style="padding:20px;text-align:center;color:#991b1b;font-size:0.82rem;">⚠ ${esc(err.message)}</div>`;
     }
+  }
+
+  // Click-to-upload
+  document.getElementById('star-cv-input').addEventListener('change', (e) => {
+    _processStarFile(e.target.files[0]);
+  });
+
+  // Drag-and-drop
+  const dz = document.getElementById('star-dz');
+  dz.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dz.style.borderColor = 'var(--accent)';
+    dz.style.background  = 'var(--bg)';
+  });
+  dz.addEventListener('dragleave', () => {
+    dz.style.borderColor = 'var(--border)';
+    dz.style.background  = 'var(--bg-2)';
+  });
+  dz.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dz.style.borderColor = 'var(--border)';
+    dz.style.background  = 'var(--bg-2)';
+    const file = e.dataTransfer.files[0];
+    if (file) _processStarFile(file);
   });
 }
 
