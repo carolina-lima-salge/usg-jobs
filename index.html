@@ -167,8 +167,9 @@
     /* Row 1: search grows, CV button pinned right */
     .filter-primary { display: flex; align-items: center; gap: 8px; }
     .filter-primary > div:first-child { flex: 1; min-width: 0; }
-    /* Row 2: filter chips only */
-    .filter-secondary { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+    /* Row 2: filter chips — scrolls horizontally if content overflows */
+    .filter-secondary { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .filter-secondary::-webkit-scrollbar { display: none; }
     select.filter-select {
       border: 1px solid var(--border); border-radius: var(--radius);
       padding: 5px 26px 5px 10px; font-size: 0.8rem; background: var(--surface);
@@ -686,7 +687,7 @@
 <div id="filter-bar" class="sticky top-0 z-20">
   <div style="max-width:1100px;margin:0 auto;padding:8px 20px;">
     <div class="filter-row">
-      <!-- Row 1: Search bar + result count -->
+      <!-- Row 1: Search + CV button -->
       <div class="filter-primary">
         <div style="position:relative;flex:1;min-width:0;">
           <svg style="position:absolute;left:8px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-3);pointer-events:none;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -699,10 +700,13 @@
                  onblur="this.style.outline='none'" />
           <datalist id="search-suggestions"></datalist>
         </div>
-        <span id="result-count" style="font-size:0.78rem;color:var(--text-3);white-space:nowrap;flex-shrink:0;"></span>
+        <button id="btn-cv-toggle"
+          style="font-size:0.78rem;padding:5px 14px;border-radius:var(--radius);border:none;cursor:pointer;white-space:nowrap;font-family:inherit;background:var(--accent);color:#fff;font-weight:500;flex-shrink:0;height:30px;">
+          Match my CV/Resume
+        </button>
       </div>
 
-      <!-- Row 2: Filter chips + CV button -->
+      <!-- Row 2: Filter chips + count -->
       <div class="filter-secondary">
 
         <!-- Institution multi-select -->
@@ -797,12 +801,7 @@
           Clear
         </button>
 
-        <!-- spacer + CV button pinned right -->
-        <span style="flex:1;min-width:0;"></span>
-        <button id="btn-cv-toggle"
-          style="font-size:0.78rem;padding:5px 14px;border-radius:var(--radius);border:none;cursor:pointer;white-space:nowrap;font-family:inherit;background:var(--accent);color:#fff;font-weight:500;flex-shrink:0;height:30px;">
-          Match my CV/Resume
-        </button>
+        <span id="result-count" style="font-size:0.78rem;color:var(--text-3);white-space:nowrap;margin-left:auto;flex-shrink:0;"></span>
       </div>
     </div>
   </div>
