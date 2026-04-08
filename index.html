@@ -1493,7 +1493,7 @@ function renderSimilarJobs(job) {
     .slice(0, 5);
   if (!matches.length) return '';
   const chips = matches.map(j => `
-    <button onclick="openJob(${JSON.stringify(j.id)})"
+    <button onclick="openJob('${esc(j.id)}')"
        style="display:block;width:100%;text-align:left;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);
               cursor:pointer;color:var(--text-1);background:var(--bg);transition:border-color .15s;font-size:0.78rem;line-height:1.4;font-family:inherit;"
        onmouseover="this.style.borderColor='var(--accent)'"
@@ -1550,12 +1550,22 @@ function fmtDateShort(str) {
 }
 
 function openJob(id) {
-  // Find the row in the rendered list; if not visible, scroll to it first
-  const row = document.querySelector(`.job-row[data-id="${CSS.escape(id)}"]`);
-  if (row) {
-    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if (expandedId !== id) toggleExpand(id, row);
+  // If the job isn't on the current page, find which page it's on and go there
+  const jobIndex = filtered.findIndex(j => j.id === id);
+  if (jobIndex === -1) return; // not in current filtered list
+  const targetPage = Math.floor(jobIndex / PAGE_SIZE) + 1;
+  if (targetPage !== currentPage) {
+    currentPage = targetPage;
+    render();
   }
+  // Now find and open the row
+  setTimeout(() => {
+    const row = document.querySelector(`.job-row[data-id="${CSS.escape(id)}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (expandedId !== id) toggleExpand(id, row);
+    }
+  }, 50);
 }
 
 function toggleExpand(id, row) {
