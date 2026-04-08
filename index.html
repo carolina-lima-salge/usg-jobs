@@ -1492,7 +1492,7 @@ function renderCard(job) {
   const badgeCls  = sourceBadgeClass(job.source);
   const instLabel = job.institution || 'Unknown';
   const closes    = job.closes ? ` · Closes ${fmtDate(job.closes)}` : '';
-  const postedShort = job.posted ? fmtDateShort(job.posted) : '—';
+  const postedShort = job.posted ? fmtDateShort(job.posted) : 'Not Reported';
 
   const cvMatchHtml   = matchMode && cvScores[job.id] != null
     ? matchBadge(cvScores[job.id], cvReasons[job.id], job) : '';
@@ -1568,7 +1568,7 @@ function renderCard(job) {
     `<span class="badge ${badgeCls}">${esc(instLabel)}</span>`,
     job.location ? `<span class="m-txt">${esc(job.location)}</span>` : '',
     (typeBadgeHtml || remoteTag) ? `${typeBadgeHtml}${remoteTag}` : '',
-    postedShort !== '—' ? `<span class="m-txt" style="color:var(--text-3);">${postedShort}</span>` : '',
+    `<span class="m-txt" style="color:var(--text-3);">${postedShort}</span>`,
   ].filter(Boolean).join('<span class="m-sep">·</span>');
 
   return `
