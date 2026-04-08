@@ -162,13 +162,14 @@
 
     /* ── Filter toolbar ── */
     #filter-bar { border-bottom: 1px solid var(--border); background: var(--surface); }
-    .filter-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-    /* Row 1: search only — grows to fill its own line */
-    .filter-primary  { display: flex; align-items: center; flex: 1; min-width: 0; }
-    /* Row 2: all filter controls — forced onto its own line via flex-basis:100% */
+    /* Two-row stacked layout — both rows share the same edges */
+    .filter-row { display: flex; flex-direction: column; gap: 5px; }
+    /* Row 1: search + CV button — side-by-side, search grows */
+    .filter-primary  { display: flex; align-items: center; gap: 8px; }
+    .filter-primary > div:first-child { flex: 1; min-width: 0; }
+    /* Row 2: all filter controls — horizontally scrollable */
     .filter-secondary {
-      display: flex; align-items: center; gap: 6px;
-      flex-basis: 100%; flex-wrap: nowrap;
+      display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
     }
     select.filter-select {
       border: 1px solid var(--border); border-radius: var(--radius);
@@ -473,18 +474,13 @@
 
       /* Filter bar: two-row layout */
       #filter-bar > div { padding: 7px 10px !important; }
-      #filter-bar .filter-row { flex-direction: column; align-items: stretch; gap: 5px; flex-wrap: nowrap; }
-      .filter-primary  { flex: unset; }
       .filter-secondary {
-        flex-basis: auto; /* reset desktop 100% basis; mobile column handles width */
-        overflow-x: auto; flex-wrap: nowrap;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 2px; gap: 5px;
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px;
       }
       .filter-secondary::-webkit-scrollbar { display: none; }
-      .filter-secondary .filter-sep { display: none; }
-      /* On mobile, filter-primary wraps search + CV button — keep them inline */
-      .filter-primary { flex-wrap: wrap; gap: 5px; }
+      /* On small screens let CV button wrap below search if needed */
+      .filter-primary { flex-wrap: wrap; }
       #btn-cv-toggle { flex-shrink: 0; }
 
       /* Auth/profile modals: full-height on mobile */
@@ -797,9 +793,6 @@
           <option value="Legal &amp; Compliance">Legal &amp; Compliance</option>
           <option value="Safety &amp; Security">Safety &amp; Security</option>
         </select>
-
-        <!-- Separator -->
-        <div class="filter-sep" style="width:1px;height:18px;background:var(--border);flex-shrink:0;"></div>
 
         <!-- Clear filters -->
         <button id="btn-clear" style="font-size:0.78rem;color:var(--accent);background:none;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;padding:0;" class="hidden">
@@ -1905,14 +1898,68 @@ function detectArchetype(job) {
 }
 
 // ── ATS Keyword Gap Analysis ─────────────────────────────────────────────────
-const _KW_STOP = new Set(('the a an and or but in on at to for of with by from as is was are be been being have has had do does did will would could should may might not all any both this that these those their they them we our you your its it also include including well work position required ability experience skills knowledge related within across ensure support provide develop manage maintain responsible opportunity join team new university college georgia state tech role responsibilities duties report position working environment ability required requirements must each other own some such then through under after while also even during between without upon both such further though where however therefore since used using various often may well across within').split(' '));
+const _KW_STOP = new Set((
+  // Core stopwords
+  'the a an and or but in on at to for of with by from as is was are were be been being have has had do does did will would could should may might not all any both this that these those their they them we our you your its it ' +
+  // Conjunctions / connectors
+  'also also include including well within across toward towards between without upon both such further though where however therefore since used using various often per about above below near like into onto among through until after before while even during unless although despite etc via nor neither either whether each every few more most other some such just here there then when ' +
+  // Generic verbs / job-posting boilerplate verbs
+  'work works worked working join joins joined joining serve serves served serving help helps helped helping assist assists assisted assisting support supports supported supporting ' +
+  'provide provides provided providing develop develops developed developing manage manages managed maintaining maintain maintained ensuring ensure ensures ' +
+  'report reports reported reporting use uses used make makes made perform performs performed performing create creates created creating build builds built building ' +
+  'apply applies applied applying assign assigns assigned assigning run runs ran running require requires required requiring include includes included ' +
+  'complete completes completed completing process processes processed processing review reviews reviewed reviewing coordinate coordinates coordinated coordinating ' +
+  'plan plans planned planning meet meets met meeting design designs designed designing implement implements implemented implementing analyze analyzes analyzed analyzing ' +
+  'prepare prepares prepared preparing present presents presented presenting submit submits submitted submitting update updates updated updating identify identifies identified identifying ' +
+  'facilitate facilitates facilitated facilitating communicate communicates communicated communicating collaborate collaborates collaborated collaborating contribute contributes contributed contributing ' +
+  'demonstrate demonstrates demonstrated demonstrating engage engages engaged engaging evaluate evaluates evaluated evaluating execute executes executed executing ' +
+  'oversee oversees oversaw overseeing supervise supervises supervised supervising ' +
+  // Generic role/job nouns
+  'position role responsibilities duties candidate applicant member staff employee employer workplace environment opportunity department office program division unit area field function task activities ' +
+  'team person individual people staff employee employer hire hiring candidate applicants role position title level type basis schedule ' +
+  // Generic adjectives
+  'strong excellent outstanding good best high quality effective efficient successful relevant current daily weekly monthly annual full part time required preferred desired needed motivated collaborative dynamic innovative proactive eager passionate dedicated committed diverse inclusive equitable professional general specific different multiple ' +
+  // University boilerplate
+  'university college georgia state tech campus school institute faculty ability abilities willingness potential qualified qualification criteria minimum maximum ' +
+  // Trailing bits
+  'must able new form date hours year years number amount percent additional other own same'
+).split(' ').filter(Boolean));
+
+// Extra verb/generic patterns to strip from keyword extraction
+const _KW_VERB_RE = /^(?:appli|assign|run|help|assist|provid|support|develop|manag|maintain|ensur|requir|includ|perform|complet|process|review|report|coordinat|serv|meet|utiliz|facilitat|communic|identif|participat|collaborat|contribut|demonstrat|engag|evaluat|execut|formulat|generat|implement|interpret|introduc|investigat|monitor|navigat|operat|oversee|prepar|present|promot|recommend|respond|schedul|submit|supervis|translat|troubleshoot|updat|verif)/;
+const _KW_SUFFIX_SKIP_RE = /(?:ing|ings|tion|tions|ment|ments|ness|ness|ship|ships|ance|ances|ence|ences|ful|less|able|ible|ive|ives|ize|ises|ized|izing)$/;
+// Short words (≤4 chars) that ARE meaningful domain terms — kept even if short
+const _KW_DOMAIN_SHORT = new Set(['data','java','perl','ruby','rust','r','sql','api','aws','gis','irb','lab','nih','nsf','dna','rna','pcr','nmr','eeg','icu','cpr','cad','bim','erp','crm','lms','hipaa','ferpa','gdpr','stem','math','stat','code','lean','agile','scrum','kanban','devops','ci/cd','rest','soap','xml','json','html','css','llm','nlp','ocr','iot','vpn','ldap','saml']);
 
 function extractJobKeywords(job) {
-  const text = `${job.title || ''} ${job.department || ''} ${job.summary || ''}`.toLowerCase();
-  const words = text.match(/\b[a-z][\w\-]{3,}\b/g) || [];
-  const freq = {};
-  words.forEach(w => { if (!_KW_STOP.has(w)) freq[w] = (freq[w] || 0) + 1; });
-  return Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 28).map(([w]) => w);
+  const titleDept = `${job.title || ''} ${job.department || ''}`.toLowerCase();
+  const fullText  = `${titleDept} ${job.summary || ''}`.toLowerCase();
+
+  const words = fullText.match(/\b[a-z][\w.#+\-]{2,}\b/g) || [];
+  const freq  = {};
+  words.forEach(w => {
+    if (_KW_STOP.has(w)) return;
+    // Drop hyphenated internal codes like "vpr-ctr", "usg-001" (short-short pattern)
+    if (/^[a-z]{2,5}-[a-z\d]{2,5}$/.test(w) && !w.includes('++') && !_KW_DOMAIN_SHORT.has(w)) return;
+    // Drop single-digit or numeric tokens
+    if (/^\d+$/.test(w)) return;
+    // Keep known short domain terms; otherwise require ≥5 chars
+    if (w.length < 5 && !_KW_DOMAIN_SHORT.has(w)) return;
+    // Drop plain past-tense / gerund forms of common job-posting verbs
+    if (_KW_VERB_RE.test(w) && _KW_SUFFIX_SKIP_RE.test(w)) return;
+    freq[w] = (freq[w] || 0) + 1;
+  });
+
+  // Boost words that appear in the title / department — they're the most signal-rich
+  const titleSet = new Set((titleDept.match(/\b[a-z][\w.#+\-]{2,}\b/g) || []).filter(w => !_KW_STOP.has(w)));
+
+  return Object.entries(freq)
+    .sort((a, b) => {
+      const boost = (titleSet.has(b[0]) ? 4 : 0) - (titleSet.has(a[0]) ? 4 : 0);
+      return boost || b[1] - a[1];
+    })
+    .slice(0, 28)
+    .map(([w]) => w);
 }
 
 function renderKeywordGap(job) {
@@ -2177,13 +2224,18 @@ function matchBadge(score, reason, job) {
     const keywords = extractJobKeywords(job);
     const found = keywords.filter(k => cv.includes(k));
     const kw_pct = keywords.length ? Math.round((found.length / keywords.length) * 100) : 0;
-    const breakdown = [`Keywords: ${kw_pct}%`];
-    // Seniority indicator
-    const cvLvl = (typeof detectCVLevel === 'function') ? detectCVLevel(cvTextGlobal) : '';
-    const jobLvl = (typeof detectJobLevel === 'function') ? detectJobLevel(job) : '';
-    if (cvLvl && jobLvl && cvLvl !== 'unknown' && jobLvl !== 'unknown') {
-      const seniorityOk = cvLvl === jobLvl || (cvLvl === 'senior' && jobLvl === 'mid') || (cvLvl === 'mid' && jobLvl === 'entry');
-      breakdown.push(`Seniority: ${seniorityOk ? '✓ good fit' : '⚠ may be over/underqualified'}`);
+    const breakdown = [`${kw_pct}% of job keywords found in your CV`];
+    // Seniority — be specific about direction
+    const cvLvl  = (typeof detectCVLevel === 'function')  ? detectCVLevel(cvTextGlobal) : -1;
+    const jobLvl = (typeof detectJobLevel === 'function') ? detectJobLevel(job) : -1;
+    if (cvLvl >= 0 && jobLvl >= 0) {
+      if (cvLvl === jobLvl || (cvLvl === 2 && jobLvl === 3) || (cvLvl === 1 && jobLvl === 2)) {
+        breakdown.push('✓ Seniority looks like a good fit');
+      } else if (cvLvl > jobLvl) {
+        breakdown.push('⚠ You may be overqualified for this role');
+      } else {
+        breakdown.push('⚠ This role may require more experience than your CV shows');
+      }
     }
     if (breakdown.length) {
       if (tip) tip += ' · ';
