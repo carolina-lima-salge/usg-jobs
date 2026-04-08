@@ -163,8 +163,9 @@
     /* ── Filter toolbar ── */
     #filter-bar { border-bottom: 1px solid var(--border); background: var(--surface); }
     .filter-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-    .filter-primary { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-    .filter-secondary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    /* On desktop these wrappers are invisible — children join .filter-row's flex directly */
+    .filter-primary  { display: contents; }
+    .filter-secondary { display: contents; }
     select.filter-select {
       border: 1px solid var(--border); border-radius: var(--radius);
       padding: 5px 26px 5px 10px; font-size: 0.8rem; background: var(--surface);
@@ -465,13 +466,13 @@
       /* Filter bar: two-row layout */
       #filter-bar > div { padding: 7px 10px !important; }
       #filter-bar .filter-row { flex-direction: column; align-items: stretch; gap: 5px; flex-wrap: nowrap; }
-      .filter-primary { flex: unset; }
+      /* Restore real flex boxes on mobile (overrides desktop display:contents) */
+      .filter-primary  { display: flex; align-items: center; gap: 6px; }
       .filter-secondary {
-        overflow-x: auto;
-        flex-wrap: nowrap;
+        display: flex; align-items: center;
+        overflow-x: auto; flex-wrap: nowrap;
         -webkit-overflow-scrolling: touch;
-        padding-bottom: 2px;
-        gap: 5px;
+        padding-bottom: 2px; gap: 5px;
       }
       .filter-secondary::-webkit-scrollbar { display: none; }
       .filter-secondary .filter-sep { display: none; }
@@ -2748,6 +2749,25 @@ _sb.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
+// ── Analytics button fallback ─────────────────────────────────────────────────
+// If the auth event fired but loadProfile completed with null/pending, retry once
+// after the page has fully settled. This catches bfcache restores and slow networks.
+function _syncAnalyticsBtn() {
+  const btn = document.getElementById('umenu-analytics');
+  if (!btn || !currentUser) return;
+  const tier = getUserTier();
+  if (tier === 'pending') return; // still loading — nothing to do yet
+  btn.style.display = tier === 'pro' ? '' : 'none';
+}
+setTimeout(async () => {
+  if (!currentUser) return;
+  if (getUserTier() === 'pending') {
+    // Profile didn't load via the auth event — try once more
+    try { await loadProfile(); } catch(e) {}
+  }
+  _syncAnalyticsBtn();
+}, 1500);
+
 // ── Header UI ─────────────────────────────────────────────────────────────────
 function updateHeaderUI() {
   const btnSignin = document.getElementById('btn-signin');
@@ -3185,7 +3205,9 @@ let _selectedTier = 'basic'; // 'free' | 'basic' | 'pro'
 
 function getUserTier() {
   if (!currentUser) return 'free';
-  if (userProfile === undefined) return 'pending'; // profile not loaded yet — don't restrict
+  // undefined = fetch not started/completed yet; null = fetch returned no row (treat as pending too
+  // so a transient network failure doesn't permanently downgrade a Pro user to free)
+  if (userProfile === undefined || userProfile === null) return 'pending';
   if (userProfile?.subscription_status === 'active') {
     // 'basic' is treated as 'pro' under the new 2-tier system
     const t = userProfile?.subscription_tier || 'pro';
