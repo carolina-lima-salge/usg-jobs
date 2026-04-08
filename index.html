@@ -1828,15 +1828,27 @@ async function runSemanticMatching(cvText) {
     raw[job.id] = cosine(cvEmb, jobEmb);
   });
 
-  // Calibrated absolute scoring — avoids inflating all scores via min-max.
-  // Raw cosine 0.10 → 0%,  0.65 → 100% (linear). Typical unrelated pairs
-  // score ~0.15-0.25; strong matches score 0.55+.
-  const LOW = 0.10, HIGH = 0.65;
+  // Calibrated absolute scoring.
+  // Raw cosine 0.10 → 0%, 0.50 → 100% (realistic range for CV↔job-posting pairs).
+  // Cross-document pairs (CV vs job posting) naturally score 0.25-0.50 even for
+  // strong matches — using 0.65 as HIGH was under-scoring perfect-field matches.
+  const LOW = 0.10, HIGH = 0.50;
+
+  // Title-overlap boost: reward jobs whose title keywords appear in the CV text.
+  const cvLower = cvText.toLowerCase();
+  function titleBoost(job) {
+    const titleWords = tokenize(job.title || '').filter(w => w.length > 3);
+    if (!titleWords.length) return 0;
+    const hits = titleWords.filter(w => cvLower.includes(w)).length;
+    return (hits / titleWords.length) * 0.20;  // up to +20 percentage points
+  }
+
   cvScores = {};
   allJobs.forEach(job => {
     const abs     = Math.max(0, Math.min(1, (raw[job.id] - LOW) / (HIGH - LOW)));
+    const boost   = titleBoost(job);
     const penalty = seniorityPenalty(cvLevel, detectJobLevel(job));
-    cvScores[job.id] = abs * penalty;
+    cvScores[job.id] = Math.min(1, abs + boost) * penalty;
   });
 
   matchMode   = true;
@@ -1899,13 +1911,18 @@ function runTFIDFMatching(cvText) {
     raw[job.id] = s;
   });
 
-  // Normalise relative to best match, then apply seniority penalty
+  // Normalise relative to best match, add title boost, apply seniority penalty
   const maxS = Math.max(...Object.values(raw), 1);
+  const cvLower2 = cvText.toLowerCase();
   cvScores = {};
   allJobs.forEach(job => {
     const rel     = raw[job.id] / maxS;
+    const titleWords = tokenize(job.title || '').filter(w => w.length > 3);
+    const boost = titleWords.length
+      ? (titleWords.filter(w => cvLower2.includes(w)).length / titleWords.length) * 0.20
+      : 0;
     const penalty = seniorityPenalty(cvLevel, detectJobLevel(job));
-    cvScores[job.id] = rel * penalty;
+    cvScores[job.id] = Math.min(1, rel + boost) * penalty;
   });
   matchMode = true; currentPage = 1; applyFilters();
 }
