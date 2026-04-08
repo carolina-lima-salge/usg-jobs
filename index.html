@@ -2680,7 +2680,9 @@ let savedJobIds  = new Set();   // job IDs the current user has saved
 // ── Auth state listener ───────────────────────────────────────────────────────
 _sb.auth.onAuthStateChange(async (event, session) => {
   // When the user clicks the reset link in their email, show the new-password form
+  // Don't return early — let the session be set normally so updateUser works
   if (event === 'PASSWORD_RECOVERY') {
+    currentUser = session?.user ?? null;
     openAuthModal('newpassword');
     return;
   }
@@ -2828,11 +2830,17 @@ async function doUpdatePassword() {
   if (!pass || pass.length < 6) { showMsg(msg, 'Password must be at least 6 characters.', 'err'); return; }
   if (pass !== confirm)          { showMsg(msg, 'Passwords do not match.', 'err'); return; }
   btn.disabled = true; btn.textContent = 'Saving…';
-  const { error } = await _sb.auth.updateUser({ password: pass });
-  btn.disabled = false; btn.textContent = 'Set new password';
-  if (error) { showMsg(msg, error.message, 'err'); return; }
-  showMsg(msg, '✓ Password updated! You are now signed in.', 'ok');
-  setTimeout(() => closeAuthModal(), 1800);
+  try {
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Request timed out. Please try again.')), 12000));
+    const { error } = await Promise.race([_sb.auth.updateUser({ password: pass }), timeout]);
+    btn.disabled = false; btn.textContent = 'Set new password';
+    if (error) { showMsg(msg, error.message, 'err'); return; }
+    showMsg(msg, '✓ Password updated! You are now signed in.', 'ok');
+    setTimeout(() => closeAuthModal(), 1800);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Set new password';
+    showMsg(msg, e.message, 'err');
+  }
 }
 
 function showMsg(el, text, type) {
