@@ -1992,7 +1992,7 @@ async function runLLMMatching(cvText) {
   }
 
   // Step 2 — set baseline calibrated scores for ALL jobs (AI will override top 25)
-  const LOW = 0.10, HIGH = 0.65;
+  const LOW = 0.10, HIGH = 0.50;
   cvScores = {};
   cvReasons = {};
   const isEmbedding = embLoaded;
@@ -2016,9 +2016,16 @@ async function runLLMMatching(cvText) {
     `ID:${job.id} | ${job.title} | ${job.institution}\n${(job.summary || '').substring(0, 400)}`
   ).join('\n\n---\n\n');
 
-  const userMessage = `You are an expert recruiter and career advisor. Carefully read the candidate's CV and rate how well they match each job listing on a 0–100 scale, where 100 is a perfect fit and 0 is completely unrelated.
+  const userMessage = `You are an expert recruiter and career advisor. Carefully read the candidate's CV and rate how well they match each job listing on a 0–100 scale.
 
-Consider: field alignment, required qualifications, seniority level, skills, and experience. Be realistic — only give 80+ to genuinely strong matches. A typical good match is 50–70.
+Scoring guide:
+- 90–100: Exact or near-exact match — same job title, same field, candidate clearly qualified
+- 75–89: Strong match — same broad field, most qualifications met
+- 55–74: Moderate match — related field or some qualifications met
+- 30–54: Weak match — different field but some transferable skills
+- 0–29: Poor match — largely unrelated
+
+If the candidate's current role or field exactly matches the job title and discipline, score 90+. Do not be artificially conservative.
 
 Return ONLY a valid JSON array with one object per job, in this exact format (no markdown, no explanation outside the JSON):
 [{"id": "EXACT_JOB_ID", "score": 75, "reason": "One sentence explaining the match or mismatch."}, ...]
@@ -2142,9 +2149,16 @@ function clearCVMatch() {
 }
 
 // ── CV UI events ────────────────────────────────────────────────────────────────
-document.getElementById('btn-cv-toggle').addEventListener('click', () => {
-  const tier = getUserTier();
-  if (tier === 'pending') return; // profile still loading — ignore click
+document.getElementById('btn-cv-toggle').addEventListener('click', async () => {
+  let tier = getUserTier();
+  // If profile is still loading wait up to 6 s then re-check
+  if (tier === 'pending') {
+    for (let i = 0; i < 12 && getUserTier() === 'pending'; i++) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+    tier = getUserTier();
+  }
+  if (tier === 'pending') return; // still not resolved — give up
   if (tier !== 'pro') { _selectedTier = 'pro'; showSubscribePage(); return; }
   if (matchMode) { clearCVMatch(); return; } // CV loaded — clicking removes it
   const panel = document.getElementById('cv-panel');
