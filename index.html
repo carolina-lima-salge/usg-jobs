@@ -728,6 +728,7 @@
           <option value="">All Types</option>
           <option value="Full-Time">Full-Time</option>
           <option value="Part-Time">Part-Time</option>
+          <option value="__none__">Unknown</option>
         </select>
 
         <!-- Regular / Temporary -->
@@ -735,7 +736,7 @@
           <option value="">Regular &amp; Temp</option>
           <option value="Regular">Regular</option>
           <option value="Temporary">Temporary</option>
-          <option value="__none__">Not included</option>
+          <option value="__none__">Unknown</option>
         </select>
 
         <!-- Location multi-select -->
@@ -1351,7 +1352,11 @@ function applyFilters() {
 
     if (type) {
       const ft = (job.type || '').toLowerCase();
-      if (!ft.includes(type)) return false;
+      if (type === '__none__') {
+        if (ft) return false;
+      } else {
+        if (!ft || !ft.includes(type)) return false;
+      }
     }
 
     if (employment) {
