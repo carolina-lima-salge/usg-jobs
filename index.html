@@ -2730,41 +2730,42 @@ let savedJobIds  = new Set();   // job IDs the current user has saved
 
 // ── Auth state listener ───────────────────────────────────────────────────────
 _sb.auth.onAuthStateChange(async (event, session) => {
-  // When the user clicks the reset link in their email, show the new-password form
-  // Don't return early — let the session be set normally so updateUser works
   if (event === 'PASSWORD_RECOVERY') {
     currentUser = session?.user ?? null;
     openAuthModal('newpassword');
     return;
   }
 
-  // TOKEN_REFRESHED fires whenever the JWT is silently renewed — including when
-  // any other tab (e.g. analytics.html) calls getSession().  The user hasn't
-  // changed, so just update currentUser and bail out; resetting userProfile here
-  // would cause a false "free user" flash every time the analytics tab opens/closes.
-  if (event === 'TOKEN_REFRESHED') {
-    currentUser = session?.user ?? null;
-    return;
-  }
-
+  const prevUserId = currentUser?.id ?? null;
   currentUser = session?.user ?? null;
-  // Set userProfile to undefined (pending) BEFORE updateHeaderUI so that getUserTier()
-  // returns 'pending' rather than 'free' during the gap between SIGNED_OUT and loadProfile.
-  if (currentUser) userProfile = undefined;
-  updateHeaderUI();
-  if (currentUser) {
-    if (allJobs.length > 0) applyFilters();
-    await loadSavedJobIds();
-    await loadProfile();
-    refreshSaveButtons();
-  } else {
-    savedJobIds.clear();
+
+  if (!currentUser) {
+    // Real sign-out — clear everything including cache
     userProfile = null;
+    _saveProfileCache(null, null);
+    savedJobIds.clear();
     refreshSaveButtons();
     freeSampleSet = null;
     updateFreeSample();
+    updateHeaderUI();
     if (allJobs.length > 0) applyFilters();
+    return;
   }
+
+  // If it's the same user and we already have their profile loaded, don't reset.
+  // TOKEN_REFRESHED, SIGNED_IN broadcast from another tab, etc. all land here —
+  // none of them mean the profile changed, so leave it alone.
+  if (currentUser.id === prevUserId && userProfile !== undefined) {
+    return;
+  }
+
+  // First load for this user — fetch profile
+  userProfile = undefined; // pending
+  updateHeaderUI();
+  if (allJobs.length > 0) applyFilters();
+  await loadSavedJobIds();
+  await loadProfile();
+  refreshSaveButtons();
 });
 
 // ── Header UI ─────────────────────────────────────────────────────────────────
@@ -3066,10 +3067,41 @@ function hideSavedJobs() {
 // ── Profile ───────────────────────────────────────────────────────────────────
 let userProfile = undefined;  // undefined = not yet fetched; null = fetched, no row
 
+// Cache key: store profile per user so it survives page loads / slow networks
+const _PROFILE_KEY = 'usg_profile_cache';
+function _saveProfileCache(uid, profile) {
+  try {
+    if (uid && profile) localStorage.setItem(_PROFILE_KEY, JSON.stringify({ uid, profile }));
+    else localStorage.removeItem(_PROFILE_KEY);
+  } catch(e) {}
+}
+function _loadProfileCache(uid) {
+  try {
+    const raw = localStorage.getItem(_PROFILE_KEY);
+    if (!raw) return null;
+    const { uid: cachedUid, profile } = JSON.parse(raw);
+    return cachedUid === uid ? profile : null;
+  } catch(e) { return null; }
+}
+
+// Apply cached profile immediately so tier is known before Supabase responds
+(function _applyCachedProfile() {
+  // We don't know the uid yet at script parse time; this runs after onAuthStateChange
+  // sets currentUser, so it's called explicitly inside loadProfile instead.
+})();
+
 async function loadProfile() {
   if (!currentUser) return;
-  // Race the Supabase fetch against a 10-second timeout so a hanging
-  // network call doesn't keep the user in 'pending' tier forever.
+
+  // Restore from cache immediately so the UI reflects the correct tier right away
+  const cached = _loadProfileCache(currentUser.id);
+  if (cached) {
+    userProfile = cached;
+    updateHeaderUI();
+    updatePlanBadge(cached.subscription_status, cached.subscription_tier);
+  }
+
+  // Then fetch fresh data from Supabase in the background
   let data = null, fetchError = null;
   try {
     ({ data, error: fetchError } = await sbQuery(
@@ -3077,14 +3109,17 @@ async function loadProfile() {
       10000, null
     ));
   } catch(e) { console.warn('Profile fetch error:', e); fetchError = e; }
-  // Diagnostic log — open browser console (F12) to see what Supabase returned
-  console.log('[USG] loadProfile result:', { data, fetchError, userId: currentUser?.id });
+
+  // Only update if Supabase returned real data; don't downgrade on timeout/null
   if (data) {
-    console.log('[USG] subscription_status:', data.subscription_status, '| subscription_tier:', data.subscription_tier);
-  } else {
-    console.warn('[USG] Profile row is null — RLS may be blocking the read, or no row exists for this user.');
+    userProfile = data;
+    _saveProfileCache(currentUser.id, data);
+  } else if (!cached) {
+    // No cache and no data — genuinely no profile row
+    userProfile = null;
+    _saveProfileCache(null, null);
   }
-  userProfile = data;
+  // If data is null but we have a cache, leave userProfile as the cached value
   // Refresh header label now that we have the full name (also updates subscribe button visibility)
   updateHeaderUI();
   // Update plan badge in profile modal if open
