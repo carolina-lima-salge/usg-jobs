@@ -401,12 +401,12 @@ function buildBreakdownTables(jobs) {
 
   // Job type
   const typeCounts = {};
-  jobs.forEach(j=>{ const t=j.type||'Unknown'; typeCounts[t]=(typeCounts[t]||0)+1; });
+  jobs.forEach(j=>{ const t=j.type||'Not Reported'; typeCounts[t]=(typeCounts[t]||0)+1; });
   renderTable('bd-type', typeCounts);
 
   // Employment type
   const empCounts = {};
-  jobs.forEach(j=>{ const e=j.employment||'Unknown'; empCounts[e]=(empCounts[e]||0)+1; });
+  jobs.forEach(j=>{ const e=j.employment||'Not Reported'; empCounts[e]=(empCounts[e]||0)+1; });
   renderTable('bd-emp', empCounts);
 
   // Role category
