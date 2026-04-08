@@ -2890,7 +2890,23 @@ document.getElementById('coach-textarea').addEventListener('input', function() {
       </div>
     </div>
 
-    <!-- Payment section (hidden when free tier selected) -->
+    <!-- Auth prompt — shown to logged-out visitors instead of payment buttons -->
+    <div id="sub-auth-prompt" class="hidden" style="border:1px solid var(--border);border-radius:8px;padding:16px 18px;background:var(--bg-2);text-align:center;">
+      <div style="font-size:0.88rem;font-weight:600;color:var(--text-1);margin-bottom:4px;">Ready to subscribe?</div>
+      <div style="font-size:0.8rem;color:var(--text-2);margin-bottom:14px;">Create a free account or sign in to get started — it only takes a minute.</div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button onclick="closeSubscribePage();openAuthModal('signup')"
+          class="auth-btn-primary" style="flex:1;max-width:200px;">
+          Create free account
+        </button>
+        <button onclick="closeSubscribePage();openAuthModal('signin')"
+          style="flex:1;max-width:160px;padding:9px 14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-1);font-size:0.82rem;font-family:inherit;cursor:pointer;font-weight:500;">
+          Sign in
+        </button>
+      </div>
+    </div>
+
+    <!-- Payment section (hidden when free tier selected or logged out) -->
     <div id="sub-payment-section">
       <button class="auth-btn-primary" id="sub-stripe-btn" onclick="startStripeCheckout()" style="margin-bottom:10px;">
         💳 Pay with Card / Apple Pay / Google Pay
@@ -3505,8 +3521,12 @@ function selectTier(tier) {
   document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('tier-selected'));
   const card = document.getElementById('tier-card-' + tier);
   if (card) card.classList.add('tier-selected');
-  const paySection  = document.getElementById('sub-payment-section');
-  const freeNote    = document.getElementById('sub-free-note');
+
+  // Logged-out guests: keep auth prompt visible regardless of which tier they click
+  if (!currentUser) return;
+
+  const paySection = document.getElementById('sub-payment-section');
+  const freeNote   = document.getElementById('sub-free-note');
   if (tier === 'free') {
     paySection.classList.add('hidden');
     freeNote.classList.remove('hidden');
@@ -3525,20 +3545,36 @@ async function openAnalytics() {
 }
 
 function showSubscribePage() {
-  document.getElementById('user-menu-panel').classList.add('hidden');
-  if (!currentUser) { openAuthModal('signin'); return; }
+  document.getElementById('user-menu-panel')?.classList.add('hidden');
   document.getElementById('sub-msg').textContent = '';
-  // Pre-select the next logical tier
-  const current = getUserTier();
-  const preselect = current === 'free' ? 'basic' : current === 'basic' ? 'pro' : 'pro';
-  _selectedTier = preselect;
+
+  const authPrompt  = document.getElementById('sub-auth-prompt');
+  const paySection  = document.getElementById('sub-payment-section');
+  const freeNote    = document.getElementById('sub-free-note');
+  const subtitle    = document.querySelector('#subscribe-overlay .modal-card > p');
+
+  if (!currentUser) {
+    // Guest: show plans but prompt them to sign in / create account for payment
+    _selectedTier = 'pro';
+    authPrompt.classList.remove('hidden');
+    paySection.classList.add('hidden');
+    freeNote.classList.add('hidden');
+    if (subtitle) subtitle.textContent = 'See what\'s included in each plan below.';
+  } else {
+    // Logged-in: show payment options as normal
+    authPrompt.classList.add('hidden');
+    const current  = getUserTier();
+    _selectedTier  = current === 'pro' ? 'pro' : 'pro'; // always suggest Pro upgrade
+    paySection.classList.remove('hidden');
+    freeNote.classList.add('hidden');
+    if (subtitle) subtitle.textContent = 'Click a plan to select it, then pay below.';
+    loadPayPalSDK();
+  }
+
+  // Open modal and highlight the pre-selected card
   document.getElementById('subscribe-overlay').classList.remove('hidden');
-  // Highlight correct card
   document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('tier-selected'));
-  document.getElementById('tier-card-' + preselect)?.classList.add('tier-selected');
-  document.getElementById('sub-payment-section').classList.remove('hidden');
-  document.getElementById('sub-free-note').classList.add('hidden');
-  loadPayPalSDK();
+  document.getElementById('tier-card-' + _selectedTier)?.classList.add('tier-selected');
 }
 
 function closeSubscribePage() {
