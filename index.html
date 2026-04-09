@@ -477,7 +477,14 @@
       /* Header: hide clutter, keep essentials */
       #header-subtitle { display: none; }
       #meta-bar { display: none; }
-      #btn-view-plans { display: none; }
+      /* View Plans: show in header next to Sign In, styled to match */
+      #btn-view-plans {
+        font-size: 0.78rem !important; font-weight: 600 !important;
+        padding: 5px 11px !important; margin-right: 0 !important;
+        border: 1px solid var(--accent) !important;
+        color: var(--accent) !important; background: transparent !important;
+        box-shadow: none !important;
+      }
 
       /* Filter bar: horizontally scrollable row, no scrollbar visible */
       #filter-bar > div { padding: 7px 10px !important; }
@@ -490,10 +497,9 @@
       .filter-secondary::-webkit-scrollbar { display: none; }
       #btn-cv-toggle { flex-shrink: 0; }
 
-      /* Standardize all filter bar element font sizes (≥16px prevents iOS zoom on inputs/selects) */
-      input, select, textarea,
+      /* Consistent filter font size throughout — same as desktop */
       .filter-select, .multiselect-btn,
-      #btn-cv-toggle, #btn-clear, #search { font-size: 16px !important; }
+      #btn-cv-toggle, #btn-clear, #search { font-size: 0.82rem !important; }
 
       /* Eliminate 300ms tap delay and blue highlight flash */
       button, a, .job-row, select, input,
@@ -553,12 +559,12 @@
         right: 12px;
         top: 15px;
       }
-      /* Hide desktop-only grid cells */
+      /* Hide desktop-only grid cells (important overrides inline display:flex on col-type) */
       .row-col.col-inst,
       .row-col.col-loc,
       .row-col.col-type,
       .row-col.col-cat,
-      .row-col.col-date { display: none; }
+      .row-col.col-date { display: none !important; }
       /* Show mobile meta row */
       .mob-meta {
         display: flex;
@@ -688,7 +694,7 @@
         <a href="#" onclick="resetAllFilters();return false;" style="font-size:0.95rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;text-decoration:none;">USG Jobs</a>
         <span id="header-subtitle" style="font-size:0.78rem;color:#64748b;border-left:1px solid #334155;padding-left:10px;margin-left:2px;">University System of Georgia</span>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;">
+      <div style="display:flex;align-items:center;gap:8px;">
         <div id="meta-bar" style="font-size:0.75rem;color:#64748b;white-space:nowrap;">Loading&hellip;</div>
         <!-- Auth button / user menu -->
         <button id="btn-view-plans" onclick="showSubscribePage()"
@@ -726,13 +732,9 @@
   </div>
 </header>
 
-<!-- ── Mobile info strip (job count + last updated + View Plans) ─────────────── -->
-<div id="mobile-subbar" style="display:none;background:var(--header-bg);border-bottom:1px solid #1e293b;padding:5px 14px;align-items:center;justify-content:space-between;gap:10px;">
-  <div id="mobile-meta" style="font-size:0.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;"></div>
-  <button id="mobile-btn-plans" onclick="showSubscribePage()"
-    style="font-size:0.7rem;font-weight:700;padding:3px 10px;border-radius:var(--radius);border:1px solid var(--accent);color:var(--accent);background:transparent;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">
-    View Plans
-  </button>
+<!-- ── Mobile info strip (job count + last updated) ──────────────────────────── -->
+<div id="mobile-subbar" style="display:none;background:var(--header-bg);border-bottom:1px solid #1e293b;padding:5px 14px;">
+  <div id="mobile-meta" style="font-size:0.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
 </div>
 
 <!-- ── Filter bar (sticky) ──────────────────────────────────────────────────── -->
@@ -3201,8 +3203,6 @@ function updateHeaderUI() {
     if (subBtn) subBtn.style.display = (isPro || isPending) ? 'none' : '';
     const plansBtn = document.getElementById('btn-view-plans');
     if (plansBtn) plansBtn.style.display = (isPro || isPending) ? 'none' : '';
-    const mobilePlansBtn = document.getElementById('mobile-btn-plans');
-    if (mobilePlansBtn) mobilePlansBtn.style.display = (isPro || isPending) ? 'none' : '';
   } else {
     btnSignin.classList.remove('hidden'); btnSignin.style.display = '';
     btnUser.classList.add('hidden');      btnUser.style.display   = 'none';
