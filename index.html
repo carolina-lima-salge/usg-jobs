@@ -457,7 +457,15 @@
     @media (max-width: 900px) {
       .row-header { grid-template-columns: 1fr 145px 76px 100px 85px 20px 26px; }
       #tbl-header  { grid-template-columns: 1fr 145px 76px 100px 85px 20px 26px; }
-      .row-col.col-loc { display: none; }
+      /* Hide Location from both data rows AND the header so columns stay aligned */
+      .row-col.col-loc, .tbl-col-label.col-loc { display: none; }
+      /* Filter row: allow horizontal scroll so chips don't run off screen */
+      .filter-secondary {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+      }
+      .filter-secondary::-webkit-scrollbar { display: none; }
     }
 
     /* ── Mobile (≤640px): switch to stacked card layout ── */
