@@ -462,26 +462,41 @@
 
     /* ── Mobile (≤640px): switch to stacked card layout ── */
     @media (max-width: 640px) {
-      /* Page padding */
-      main { padding: 10px !important; }
+      /* Sticky header + filter bar — always accessible without scrolling up */
+      header { position: sticky; top: 0; z-index: 300; }
+      #filter-bar { position: sticky; top: 48px; z-index: 200; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+
+      /* Page padding + safe area for iPhone home indicator */
+      main { padding: 10px 10px max(10px, env(safe-area-inset-bottom)) !important; }
       #results-panel { border-radius: 4px; }
+
+      /* Prevent accidental back-swipe while scrolling the job list */
+      #results-panel { overscroll-behavior-x: none; }
 
       /* Header: hide clutter, keep essentials */
       #header-subtitle { display: none; }
       #meta-bar { display: none; }
       #btn-view-plans { display: none; }
 
-      /* Filter bar: two-row layout */
+      /* Filter bar: horizontally scrollable row, no scrollbar visible */
       #filter-bar > div { padding: 7px 10px !important; }
       .filter-secondary {
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
         padding-bottom: 2px;
+        scroll-snap-type: none;
       }
-      .filter-secondary { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
       .filter-secondary::-webkit-scrollbar { display: none; }
       #btn-cv-toggle { flex-shrink: 0; }
 
-      /* Auth/profile modals: full-height on mobile */
+      /* iOS zoom prevention: font-size must be ≥16px on inputs/selects */
+      input, select, textarea { font-size: 16px !important; }
+
+      /* Eliminate 300ms tap delay and blue highlight flash */
+      button, a, .job-row, select, input,
+      .row-header, .ms-option, .filter-select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+      /* Auth/profile modals: slide up from bottom as a sheet */
       #auth-overlay, #profile-overlay, #subscribe-overlay,
       #saved-overlay, #tracker-overlay, #alerts-overlay {
         align-items: flex-end;
@@ -490,7 +505,7 @@
       #auth-card {
         max-width: 100%;
         border-radius: 16px 16px 0 0;
-        padding: 24px 20px 32px;
+        padding: 24px 20px max(32px, env(safe-area-inset-bottom));
       }
       .modal-card {
         max-width: 100%;
@@ -498,6 +513,23 @@
         top: 0;
         margin: 0;
         min-height: 50vh;
+        max-height: 92vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Smooth momentum scrolling on all overlay panels */
+      #auth-overlay, #profile-overlay, #subscribe-overlay,
+      #alerts-overlay, #star-modal {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+      }
+
+      /* STAR modal card: scrollable sheet */
+      #star-modal .modal-card {
+        max-height: 88vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
 
       /* Table header: hide */
@@ -508,14 +540,15 @@
         display: flex;
         flex-direction: column;
         gap: 0;
-        padding: 11px 38px 11px 12px;
+        padding: 13px 44px 13px 14px;
         position: relative;
         align-items: flex-start;
+        min-height: 56px; /* comfortable touch target */
       }
       .row-header .chevron {
         position: absolute;
         right: 12px;
-        top: 13px;
+        top: 15px;
       }
       /* Hide desktop-only grid cells */
       .row-col.col-inst,
@@ -543,8 +576,8 @@
 
       /* Coach panel: full-width near bottom */
       #coach-panel { width: calc(100vw - 16px); right: 8px; bottom: 70px; }
-      #coach-btn   { right: 14px; bottom: 14px; padding: 9px 14px; font-size: 0.8rem; }
-      #coach-nudge { right: 14px; bottom: 63px; max-width: 180px; }
+      #coach-btn   { right: 14px; bottom: max(14px, env(safe-area-inset-bottom)); padding: 9px 14px; font-size: 0.8rem; }
+      #coach-nudge { right: 14px; bottom: max(63px, calc(env(safe-area-inset-bottom) + 49px)); max-width: 180px; }
 
       /* Saved/tracker panels: full padding */
       #saved-panel, #tracker-panel { padding: 14px 12px; }
@@ -932,7 +965,7 @@
 
   <!-- ── STAR Interview Prep Modal ────────────────────────────────────────── -->
   <div id="star-modal" class="hidden"
-    onclick="if(event.target===this)this.classList.add('hidden')"
+    onclick="if(event.target===this){this.classList.add('hidden');unlockBodyScroll();}"
     >
     <div style="background:var(--surface);border-radius:8px;box-shadow:var(--shadow-md);width:100%;max-width:580px;max-height:82vh;display:flex;flex-direction:column;" onclick="event.stopPropagation()">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0;">
@@ -940,7 +973,7 @@
           <div style="font-size:0.98rem;font-weight:700;">✨ STAR Interview Prep</div>
           <div id="star-job-title" style="font-size:0.78rem;color:var(--text-2);margin-top:2px;"></div>
         </div>
-        <button onclick="document.getElementById('star-modal').classList.add('hidden')"
+        <button onclick="document.getElementById('star-modal').classList.add('hidden');unlockBodyScroll();"
           style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:1.2rem;padding:4px 8px;line-height:1;">✕</button>
       </div>
       <div id="star-content" style="overflow-y:auto;padding:16px 20px;flex:1;"></div>
@@ -1681,6 +1714,7 @@ async function openStarPrep(jobId, event) {
   const job = allJobs.find(j => j.id === jobId) || {};
   const modal = document.getElementById('star-modal');
   modal.classList.remove('hidden');
+  lockBodyScroll();
   document.getElementById('star-job-title').textContent = `${job.title || 'Job'} — ${job.institution || ''}`;
   const content = document.getElementById('star-content');
 
@@ -3165,13 +3199,35 @@ document.addEventListener('click', e => {
     document.getElementById('user-menu-panel').classList.add('hidden');
 });
 
+// ── Scroll lock (prevents background scroll on iOS when a modal is open) ──────
+let _scrollLockCount = 0;
+let _scrollLockY = 0;
+function lockBodyScroll() {
+  if (_scrollLockCount++ > 0) return;
+  _scrollLockY = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${_scrollLockY}px`;
+  document.body.style.width = '100%';
+  document.body.style.overflowY = 'scroll';
+}
+function unlockBodyScroll() {
+  if (--_scrollLockCount > 0) return;
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  document.body.style.overflowY = '';
+  window.scrollTo(0, _scrollLockY);
+}
+
 // ── Auth modal ────────────────────────────────────────────────────────────────
 function openAuthModal(view = 'signin') {
   authTab(view);
   document.getElementById('auth-overlay').classList.remove('hidden');
+  lockBodyScroll();
 }
 function closeAuthModal() {
   document.getElementById('auth-overlay').classList.add('hidden');
+  unlockBodyScroll();
 }
 function handleOverlayClick(e) {
   if (e.target === document.getElementById('auth-overlay')) closeAuthModal();
@@ -3514,6 +3570,7 @@ async function showProfileSettings() {
     document.getElementById('pf-cancel-msg').textContent = '';
   }
   document.getElementById('profile-overlay').classList.remove('hidden');
+  lockBodyScroll();
 }
 
 async function confirmCancelSubscription() {
@@ -3548,6 +3605,7 @@ async function confirmCancelSubscription() {
 
 function closeProfileSettings() {
   document.getElementById('profile-overlay').classList.add('hidden');
+  unlockBodyScroll();
 }
 
 async function saveProfile() {
@@ -3674,10 +3732,12 @@ function showSubscribePage() {
   document.getElementById('subscribe-overlay').classList.remove('hidden');
   document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('tier-selected'));
   document.getElementById('tier-card-' + _selectedTier)?.classList.add('tier-selected');
+  lockBodyScroll();
 }
 
 function closeSubscribePage() {
   document.getElementById('subscribe-overlay').classList.add('hidden');
+  unlockBodyScroll();
 }
 
 function startStripeCheckout() {
