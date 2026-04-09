@@ -462,9 +462,10 @@
 
     /* ── Mobile (≤640px): switch to stacked card layout ── */
     @media (max-width: 640px) {
-      /* Sticky header + filter bar — always accessible without scrolling up */
+      /* Sticky header + info strip + filter bar — always accessible without scrolling up */
       header { position: sticky; top: 0; z-index: 300; }
-      #filter-bar { position: sticky; top: 48px; z-index: 200; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+      #mobile-subbar { display: flex !important; position: sticky; top: 48px; z-index: 290; }
+      #filter-bar { position: sticky; top: 79px; z-index: 200; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
 
       /* Page padding + safe area for iPhone home indicator */
       main { padding: 10px 10px max(10px, env(safe-area-inset-bottom)) !important; }
@@ -586,10 +587,11 @@
       .kanban-board { gap: 8px; }
     }
 
-    /* ── Mobile landscape: un-stick the filter bar so it doesn't eat screen height ── */
+    /* ── Mobile landscape: un-stick everything and hide the subbar to save height ── */
     @media (max-height: 500px) and (orientation: landscape) {
-      header    { position: relative !important; }
-      #filter-bar { position: relative !important; top: auto !important; box-shadow: none; }
+      header         { position: relative !important; }
+      #mobile-subbar { display: none !important; }
+      #filter-bar    { position: relative !important; top: auto !important; box-shadow: none; }
     }
 
     /* ── Application Tracker ─────────────────────────────────────── */
@@ -723,6 +725,15 @@
     </div>
   </div>
 </header>
+
+<!-- ── Mobile info strip (job count + last updated + View Plans) ─────────────── -->
+<div id="mobile-subbar" style="display:none;background:var(--header-bg);border-bottom:1px solid #1e293b;padding:5px 14px;align-items:center;justify-content:space-between;gap:10px;">
+  <div id="mobile-meta" style="font-size:0.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;"></div>
+  <button id="mobile-btn-plans" onclick="showSubscribePage()"
+    style="font-size:0.7rem;font-weight:700;padding:3px 10px;border-radius:var(--radius);border:1px solid var(--accent);color:var(--accent);background:transparent;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">
+    View Plans
+  </button>
+</div>
 
 <!-- ── Filter bar (sticky) ──────────────────────────────────────────────────── -->
 <div id="filter-bar" class="sticky top-0 z-20">
@@ -1218,10 +1229,12 @@ async function loadData() {
       delete window._pendingLocs;
     }
 
-    // Meta bar
-    document.getElementById('meta-bar').innerHTML =
-      `<span class="font-semibold text-white">${allJobs.length.toLocaleString()}</span>` +
+    // Meta bar (desktop) + mobile info strip
+    const metaHtml = `<span style="font-weight:600;color:#f1f5f9;">${allJobs.length.toLocaleString()}</span>` +
       ` open positions &bull; Updated ${data.meta.last_updated || 'recently'}`;
+    document.getElementById('meta-bar').innerHTML = metaHtml;
+    const mobileMeta = document.getElementById('mobile-meta');
+    if (mobileMeta) mobileMeta.innerHTML = metaHtml;
 
     // Try loading pre-computed embeddings (resolves silently if file absent)
     tryLoadEmbeddings();
@@ -3188,6 +3201,8 @@ function updateHeaderUI() {
     if (subBtn) subBtn.style.display = (isPro || isPending) ? 'none' : '';
     const plansBtn = document.getElementById('btn-view-plans');
     if (plansBtn) plansBtn.style.display = (isPro || isPending) ? 'none' : '';
+    const mobilePlansBtn = document.getElementById('mobile-btn-plans');
+    if (mobilePlansBtn) mobilePlansBtn.style.display = (isPro || isPending) ? 'none' : '';
   } else {
     btnSignin.classList.remove('hidden'); btnSignin.style.display = '';
     btnUser.classList.add('hidden');      btnUser.style.display   = 'none';
