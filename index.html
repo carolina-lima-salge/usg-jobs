@@ -489,8 +489,10 @@
       .filter-secondary::-webkit-scrollbar { display: none; }
       #btn-cv-toggle { flex-shrink: 0; }
 
-      /* iOS zoom prevention: font-size must be ≥16px on inputs/selects */
-      input, select, textarea { font-size: 16px !important; }
+      /* Standardize all filter bar element font sizes (≥16px prevents iOS zoom on inputs/selects) */
+      input, select, textarea,
+      .filter-select, .multiselect-btn,
+      #btn-cv-toggle, #btn-clear, #search { font-size: 16px !important; }
 
       /* Eliminate 300ms tap delay and blue highlight flash */
       button, a, .job-row, select, input,
@@ -583,6 +585,13 @@
       #saved-panel, #tracker-panel { padding: 14px 12px; }
       .kanban-board { gap: 8px; }
     }
+
+    /* ── Mobile landscape: un-stick the filter bar so it doesn't eat screen height ── */
+    @media (max-height: 500px) and (orientation: landscape) {
+      header    { position: relative !important; }
+      #filter-bar { position: relative !important; top: auto !important; box-shadow: none; }
+    }
+
     /* ── Application Tracker ─────────────────────────────────────── */
     #tracker-panel { max-width: 1100px; margin: 0 auto; padding: 20px; }
     .kanban-board {
