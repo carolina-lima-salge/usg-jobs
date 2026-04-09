@@ -549,15 +549,36 @@
         display: flex;
         flex-direction: column;
         gap: 0;
-        padding: 13px 44px 13px 14px;
+        padding: 12px 44px 36px 14px; /* extra bottom room for share+save */
         position: relative;
         align-items: flex-start;
-        min-height: 56px; /* comfortable touch target */
+        min-height: 56px;
+        overflow: hidden; /* prevent any child from bursting card width */
+        box-sizing: border-box;
+      }
+      /* Main content column: must be width-constrained so long text wraps */
+      .row-header > .row-col:first-child {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
       }
       .row-header .chevron {
         position: absolute;
         right: 12px;
         top: 15px;
+      }
+      /* Pull share + save out of column flow: anchor them bottom-right */
+      .row-header .share-btn {
+        position: absolute;
+        bottom: 10px;
+        right: 40px;
+      }
+      .row-header .save-btn {
+        position: absolute;
+        bottom: 8px;
+        right: 12px;
+        font-size: 1.1rem;
       }
       /* Hide desktop-only grid cells (important overrides inline display:flex on col-type) */
       .row-col.col-inst,
@@ -572,9 +593,11 @@
         align-items: center;
         gap: 4px 6px;
         margin-top: 5px;
+        max-width: 100%;
+        overflow: hidden;
       }
       .mob-meta .m-sep { color: var(--text-3); font-size: 0.7rem; }
-      .mob-meta .m-txt { font-size: 0.75rem; color: var(--text-2); }
+      .mob-meta .m-txt { font-size: 0.75rem; color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
       /* Row detail: reduce padding */
       .row-detail { padding: 12px 14px 14px; }
