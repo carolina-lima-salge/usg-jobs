@@ -453,12 +453,11 @@
     /* ── Mobile meta (hidden on desktop) ── */
     .mob-meta { display: none; }
 
-    /* ── Tablet (≤900px): hide location, keep Type + Category ── */
+    /* ── Tablet / landscape phone (641–900px): show all columns, reduced widths ── */
     @media (max-width: 900px) {
-      .row-header { grid-template-columns: 1fr 145px 76px 100px 85px 20px 26px; }
-      #tbl-header  { grid-template-columns: 1fr 145px 76px 100px 85px 20px 26px; }
-      /* Hide Location from both data rows AND the header so columns stay aligned */
-      .row-col.col-loc, .tbl-col-label.col-loc { display: none; }
+      /* All 8 columns visible — 1fr title + 7 fixed. Fits from ~680px upward. */
+      .row-header { grid-template-columns: 1fr 125px 100px 68px 88px 78px 18px 24px; }
+      #tbl-header  { grid-template-columns: 1fr 125px 100px 68px 88px 78px 18px 24px; }
       /* Filter row: allow horizontal scroll so chips don't run off screen */
       .filter-secondary {
         overflow-x: auto;
