@@ -1121,14 +1121,24 @@ function buildMultiselect(optContainerId, searchInputId, clearBtnId, btnId, coun
     const isOpen = !panel.classList.contains('hidden');
     closeAllMultiselectPanels();
     if (!isOpen) {
-      panel.classList.remove('hidden');
-      // On mobile the filter bar uses overflow-x:auto which clips absolute children.
-      // Switch to fixed positioning and calculate coordinates from the button's viewport rect.
+      // On mobile/tablet the filter bar has -webkit-overflow-scrolling:touch which
+      // causes iOS Safari to clip or ignore position:fixed children.
+      // Fix: reparent the panel directly to <body> so it fully escapes the container.
+      if (window.innerWidth <= 900 && panel.parentElement !== document.body) {
+        panel._msOriginalParent = panel.parentElement;
+        document.body.appendChild(panel);
+      }
       if (window.innerWidth <= 900) {
         const rect = e.currentTarget.getBoundingClientRect();
-        panel.style.top  = (rect.bottom + 4) + 'px';
-        panel.style.left = '';   // CSS handles left/right via media query
+        panel.style.position = 'fixed';
+        panel.style.top      = (rect.bottom + 4) + 'px';
+        panel.style.left     = '12px';
+        panel.style.right    = '12px';
+        panel.style.width    = 'auto';
+        panel.style.minWidth = 'unset';
+        panel.style.zIndex   = '9999';
       }
+      panel.classList.remove('hidden');
     }
   });
 
@@ -1150,7 +1160,15 @@ function updateMultiselectBtn(btnId, countId, selectedSet) {
 }
 
 function closeAllMultiselectPanels() {
-  document.querySelectorAll('.multiselect-panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.multiselect-panel').forEach(p => {
+    p.classList.add('hidden');
+    // Move panel back to its original parent if it was reparented to body
+    if (p._msOriginalParent && p.parentElement === document.body) {
+      p._msOriginalParent.appendChild(p);
+      p.style.position = p.style.top = p.style.left =
+        p.style.right = p.style.width = p.style.minWidth = p.style.zIndex = '';
+    }
+  });
 }
 
 // Close panels when clicking outside
