@@ -436,20 +436,6 @@
     .share-btn:hover { color: var(--accent); transform: scale(1.2); }
     .share-btn.copied { color: #16a34a; }
 
-    /* ── Search autocomplete dropdown ── */
-    .ac-item {
-      padding: 9px 12px; font-size: 0.82rem; color: var(--text-1);
-      cursor: pointer; border-bottom: 1px solid var(--border);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .ac-item:last-child { border-bottom: none; }
-    .ac-item:hover, .ac-item:active { background: var(--bg-2); }
-    .ac-item svg { flex-shrink: 0; color: var(--text-3); }
-    .ac-item mark { background: none; color: var(--accent); font-weight: 600; }
-    /* Bigger tap targets on mobile */
-    @media (max-width: 900px) { .ac-item { padding: 12px 14px; font-size: 0.88rem; } }
-
     /* ── Share toast notification ── */
     #share-toast {
       position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -467,29 +453,11 @@
     /* ── Mobile meta (hidden on desktop) ── */
     .mob-meta { display: none; }
 
-    /* ── Tablet / landscape phone (641–900px) ── */
+    /* ── Tablet (≤900px): hide location, keep Type + Category ── */
     @media (max-width: 900px) {
-      /* Reduce page padding so the table gets maximum width */
-      main { padding: 12px !important; }
-      /* All 8 columns — position column gets ~285px on 844px landscape phones */
-      .row-header { grid-template-columns: 1fr 130px 95px 66px 88px 76px 18px 22px; }
-      #tbl-header  { grid-template-columns: 1fr 130px 95px 66px 88px 76px 18px 22px; }
-      /* Filter row: allow horizontal scroll so chips don't run off screen */
-      .filter-secondary {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        flex-wrap: nowrap;
-      }
-      .filter-secondary::-webkit-scrollbar { display: none; }
-      /* Panels escape the overflow-x:auto container via fixed positioning */
-      .multiselect-panel {
-        position: fixed !important;
-        left: 12px !important;
-        right: 12px !important;
-        min-width: unset !important;
-        width: auto !important;
-        z-index: 9999 !important;
-      }
+      .row-header { grid-template-columns: 1fr 145px 76px 100px 85px 20px 26px; }
+      #tbl-header  { grid-template-columns: 1fr 145px 76px 100px 85px 20px 26px; }
+      .row-col.col-loc { display: none; }
     }
 
     /* ── Mobile (≤640px): switch to stacked card layout ── */
@@ -509,14 +477,7 @@
       /* Header: hide clutter, keep essentials */
       #header-subtitle { display: none; }
       #meta-bar { display: none; }
-      /* View Plans: show in header next to Sign In, styled to match */
-      #btn-view-plans {
-        font-size: 0.78rem !important; font-weight: 700 !important;
-        padding: 5px 11px !important; margin-right: 0 !important;
-        border: none !important;
-        color: white !important; background: var(--accent) !important;
-        box-shadow: none !important;
-      }
+      #btn-view-plans { display: none; }
 
       /* Filter bar: horizontally scrollable row, no scrollbar visible */
       #filter-bar > div { padding: 7px 10px !important; }
@@ -529,9 +490,10 @@
       .filter-secondary::-webkit-scrollbar { display: none; }
       #btn-cv-toggle { flex-shrink: 0; }
 
-      /* Consistent filter font size throughout — same as desktop */
+      /* Standardize all filter bar element font sizes (≥16px prevents iOS zoom on inputs/selects) */
+      input, select, textarea,
       .filter-select, .multiselect-btn,
-      #btn-cv-toggle, #btn-clear, #search { font-size: 0.82rem !important; }
+      #btn-cv-toggle, #btn-clear, #search { font-size: 16px !important; }
 
       /* Eliminate 300ms tap delay and blue highlight flash */
       button, a, .job-row, select, input,
@@ -581,43 +543,22 @@
         display: flex;
         flex-direction: column;
         gap: 0;
-        padding: 12px 44px 36px 14px; /* extra bottom room for share+save */
+        padding: 13px 44px 13px 14px;
         position: relative;
         align-items: flex-start;
-        min-height: 56px;
-        overflow: hidden; /* prevent any child from bursting card width */
-        box-sizing: border-box;
-      }
-      /* Main content column: must be width-constrained so long text wraps */
-      .row-header > .row-col:first-child {
-        width: 100%;
-        min-width: 0;
-        max-width: 100%;
-        overflow: hidden;
+        min-height: 56px; /* comfortable touch target */
       }
       .row-header .chevron {
         position: absolute;
         right: 12px;
         top: 15px;
       }
-      /* Pull share + save out of column flow: anchor them bottom-right */
-      .row-header .share-btn {
-        position: absolute;
-        bottom: 10px;
-        right: 40px;
-      }
-      .row-header .save-btn {
-        position: absolute;
-        bottom: 8px;
-        right: 12px;
-        font-size: 1.1rem;
-      }
-      /* Hide desktop-only grid cells (important overrides inline display:flex on col-type) */
+      /* Hide desktop-only grid cells */
       .row-col.col-inst,
       .row-col.col-loc,
       .row-col.col-type,
       .row-col.col-cat,
-      .row-col.col-date { display: none !important; }
+      .row-col.col-date { display: none; }
       /* Show mobile meta row */
       .mob-meta {
         display: flex;
@@ -625,11 +566,9 @@
         align-items: center;
         gap: 4px 6px;
         margin-top: 5px;
-        max-width: 100%;
-        overflow: hidden;
       }
       .mob-meta .m-sep { color: var(--text-3); font-size: 0.7rem; }
-      .mob-meta .m-txt { font-size: 0.75rem; color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mob-meta .m-txt { font-size: 0.75rem; color: var(--text-2); }
 
       /* Row detail: reduce padding */
       .row-detail { padding: 12px 14px 14px; }
@@ -749,7 +688,7 @@
         <a href="#" onclick="resetAllFilters();return false;" style="font-size:0.95rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;text-decoration:none;">USG Jobs</a>
         <span id="header-subtitle" style="font-size:0.78rem;color:#64748b;border-left:1px solid #334155;padding-left:10px;margin-left:2px;">University System of Georgia</span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div style="display:flex;align-items:center;gap:12px;">
         <div id="meta-bar" style="font-size:0.75rem;color:#64748b;white-space:nowrap;">Loading&hellip;</div>
         <!-- Auth button / user menu -->
         <button id="btn-view-plans" onclick="showSubscribePage()"
@@ -787,9 +726,13 @@
   </div>
 </header>
 
-<!-- ── Mobile info strip (job count + last updated) ──────────────────────────── -->
-<div id="mobile-subbar" style="display:none;background:var(--header-bg);border-bottom:1px solid #1e293b;padding:5px 14px;">
-  <div id="mobile-meta" style="font-size:0.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+<!-- ── Mobile info strip (job count + last updated + View Plans) ─────────────── -->
+<div id="mobile-subbar" style="display:none;background:var(--header-bg);border-bottom:1px solid #1e293b;padding:5px 14px;align-items:center;justify-content:space-between;gap:10px;">
+  <div id="mobile-meta" style="font-size:0.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;"></div>
+  <button id="mobile-btn-plans" onclick="showSubscribePage()"
+    style="font-size:0.7rem;font-weight:700;padding:3px 10px;border-radius:var(--radius);border:1px solid var(--accent);color:var(--accent);background:transparent;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">
+    View Plans
+  </button>
 </div>
 
 <!-- ── Filter bar (sticky) ──────────────────────────────────────────────────── -->
@@ -803,14 +746,11 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
           <input id="search" type="search" placeholder="Search titles, departments…"
-                 autocomplete="off"
+                 list="search-suggestions" autocomplete="off"
                  style="border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px 5px 28px;font-size:0.8rem;width:100%;height:30px;outline:none;font-family:inherit;color:var(--text-1);background:var(--surface);"
                  onfocus="this.style.outlineColor='var(--accent)';this.style.outline='2px solid var(--accent)';this.style.outlineOffset='-1px'"
-                 onblur="this.style.outline='none'; setTimeout(hideAc, 150)" />
-          <!-- Custom autocomplete dropdown (works on all mobile browsers) -->
-          <div id="search-ac" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:9990;
-               background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-               box-shadow:0 6px 18px rgba(0,0,0,0.12);overflow-y:auto;max-height:220px;"></div>
+                 onblur="this.style.outline='none'" />
+          <datalist id="search-suggestions"></datalist>
         </div>
         <span id="result-count" style="font-size:0.78rem;color:var(--text-3);white-space:nowrap;flex-shrink:0;"></span>
       </div>
@@ -1120,16 +1060,7 @@ function buildMultiselect(optContainerId, searchInputId, clearBtnId, btnId, coun
     const panel = document.getElementById(panelId);
     const isOpen = !panel.classList.contains('hidden');
     closeAllMultiselectPanels();
-    if (!isOpen) {
-      panel.classList.remove('hidden');
-      // On mobile the filter bar uses overflow-x:auto which clips absolute children.
-      // Switch to fixed positioning and calculate coordinates from the button's viewport rect.
-      if (window.innerWidth <= 900) {
-        const rect = e.currentTarget.getBoundingClientRect();
-        panel.style.top  = (rect.bottom + 4) + 'px';
-        panel.style.left = '';   // CSS handles left/right via media query
-      }
-    }
+    if (!isOpen) panel.classList.remove('hidden');
   });
 
   // Stop clicks inside panel from bubbling to document (which would close it)
@@ -1420,81 +1351,22 @@ function updateFreeSample() {
 let searchTimer = null;
 
 function onSearchInput() {
-  const q = document.getElementById('search').value;
-  showAcSuggestions(q);
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => { currentPage = 1; applyFilters(); saveStateToHash(); }, 220);
 }
 
-// ── Custom autocomplete ────────────────────────────────────────────────────────
-function _acHighlight(text, q) {
-  if (!q) return esc(text);
-  const idx = text.toLowerCase().indexOf(q.toLowerCase());
-  if (idx < 0) return esc(text);
-  return esc(text.slice(0, idx)) +
-    `<mark>${esc(text.slice(idx, idx + q.length))}</mark>` +
-    esc(text.slice(idx + q.length));
-}
-
-function _acIcon(type) {
-  // search icon for titles, building icon for institutions, tag for depts
-  if (type === 'inst') return `<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>`;
-  if (type === 'dept') return `<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>`;
-  return `<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>`;
-}
-
-function showAcSuggestions(q) {
-  const panel = document.getElementById('search-ac');
-  if (!panel) return;
-  if (!q || q.length < 2 || !allJobs.length) { panel.style.display = 'none'; return; }
-  const ql = q.toLowerCase();
+function buildSearchSuggestions() {
+  const dl = document.getElementById('search-suggestions');
+  if (!dl || !allJobs.length) return;
+  // Collect unique titles and departments, capped at 200 suggestions
   const seen = new Set();
-  const hits = []; // { label, type }
-
+  const items = [];
   for (const job of allJobs) {
-    if (hits.length >= 10) break;
-    if (job.title && job.title.toLowerCase().includes(ql) && !seen.has(job.title)) {
-      seen.add(job.title); hits.push({ label: job.title, type: 'title' });
-    }
+    if (job.title && !seen.has(job.title)) { seen.add(job.title); items.push(job.title); }
+    if (items.length >= 200) break;
   }
-  for (const job of allJobs) {
-    if (hits.length >= 10) break;
-    if (job.department && job.department.toLowerCase().includes(ql) && !seen.has(job.department)) {
-      seen.add(job.department); hits.push({ label: job.department, type: 'dept' });
-    }
-  }
-  for (const job of allJobs) {
-    if (hits.length >= 10) break;
-    if (job.institution && job.institution.toLowerCase().includes(ql) && !seen.has(job.institution)) {
-      seen.add(job.institution); hits.push({ label: job.institution, type: 'inst' });
-    }
-  }
-
-  if (!hits.length) { panel.style.display = 'none'; return; }
-  panel.innerHTML = hits.map(h =>
-    `<div class="ac-item" onmousedown="pickAcSuggestion(event,'${h.label.replace(/'/g,"\\'")}')">
-       ${_acIcon(h.type)}
-       <span>${_acHighlight(h.label, q)}</span>
-     </div>`
-  ).join('');
-  panel.style.display = 'block';
+  dl.innerHTML = items.map(t => `<option value="${t.replace(/"/g,'&quot;')}"></option>`).join('');
 }
-
-function pickAcSuggestion(e, value) {
-  e.preventDefault(); // keep input focused, don't trigger blur first
-  const inp = document.getElementById('search');
-  inp.value = value;
-  document.getElementById('search-ac').style.display = 'none';
-  currentPage = 1; applyFilters(); saveStateToHash();
-}
-
-function hideAc() {
-  const panel = document.getElementById('search-ac');
-  if (panel) panel.style.display = 'none';
-}
-
-// no-op kept for backward compatibility (datalist removed)
-function buildSearchSuggestions() {}
 
 function resetAllFilters() {
   // Clear text search
@@ -2126,17 +1998,11 @@ function loadStateFromHash() {
 
 // ── Event listeners ────────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', onSearchInput);
-// Dismiss autocomplete when clicking outside search area
-document.addEventListener('click', e => {
-  const wrap = document.getElementById('search').closest('div');
-  if (wrap && !wrap.contains(e.target)) hideAc();
-});
 ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary','f-category'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); saveStateToHash(); });
 });
 document.getElementById('btn-clear').addEventListener('click', () => {
   document.getElementById('search').value = '';
-  hideAc();
   ['f-type','f-employment','f-posted','f-sort','f-salary-sort','f-min-salary','f-category'].forEach(id => {
     document.getElementById(id).value = '';
   });
@@ -3335,6 +3201,8 @@ function updateHeaderUI() {
     if (subBtn) subBtn.style.display = (isPro || isPending) ? 'none' : '';
     const plansBtn = document.getElementById('btn-view-plans');
     if (plansBtn) plansBtn.style.display = (isPro || isPending) ? 'none' : '';
+    const mobilePlansBtn = document.getElementById('mobile-btn-plans');
+    if (mobilePlansBtn) mobilePlansBtn.style.display = (isPro || isPending) ? 'none' : '';
   } else {
     btnSignin.classList.remove('hidden'); btnSignin.style.display = '';
     btnUser.classList.add('hidden');      btnUser.style.display   = 'none';
