@@ -1990,14 +1990,14 @@ function salaryTag(job) {
   const t = (job.salary_type || '').toLowerCase();
   const s = (job.salary || '').toLowerCase();
   // Explicit hourly — "per hour" OR "per hours" (plural)
-  if (/\bper\s+hours?\b|\/hr\b|\/hour\b|\bhourly\b|\ban\s+hour\b/.test(s)) return '/hr';
+  if (/\bper\s+hours?\b|\/hr\b|\/hour\b|\bhourly\b|\ban\s+hour\b/.test(s)) return /\/hr\b/.test(s) ? '' : '/hr';
   // Explicit monthly — checked before semester so "$500/mo ... $25/semester" → /mo
-  if (/\bper\s+month\b|\/month\b|\/mo\b/.test(s)) return '/mo';
+  if (/\bper\s+month\b|\/month\b|\/mo\b/.test(s)) return /\/mo\b/.test(s) ? '' : '/mo';
   // Semester stipends — e.g. "$400 per semester" (RA housing, student positions)
   if (/\bper\s+semester\b|\/semester\b/.test(s)) return '/sem';
   // Weekly pay — e.g. "$500 per week", "$500/week"
   if (/\bper\s+week\b|\/week\b|\/wk\b|\bweekly\b/.test(s)) return '/wk';
-  if (s.includes('/yr') || s.includes('annual') || /academic\s+year/.test(s) || /\bper\s+year\b/.test(s)) return '/yr';
+  if (s.includes('/yr') || s.includes('annual') || /academic\s+year/.test(s) || /\bper\s+year\b/.test(s)) return s.includes('/yr') ? '' : '/yr';
   // Magnitude check on the largest dollar amount found
   const nums = [...s.matchAll(/\$\s*([\d,]+(?:\.\d+)?)/g)]
     .map(m => parseFloat(m[1].replace(/,/g, '')))
