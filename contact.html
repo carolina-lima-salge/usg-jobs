@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — USG Jobs</title>
+  <meta name="description" content="Get in touch with the USG Jobs team for feedback, bug reports, or general questions." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:           #f9fafb;
+      --surface:      #ffffff;
+      --text-1:       #111827;
+      --text-2:       #4b5563;
+      --text-3:       #9ca3af;
+      --accent:       #2563eb;
+      --accent-dark:  #1d4ed8;
+      --border:       #e5e7eb;
+      --radius:       6px;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.7;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header a { font-size: 1.1rem; font-weight: 700; color: var(--accent); text-decoration: none; }
+    header a:hover { color: var(--accent-dark); }
+    header span { color: var(--text-3); font-size: 0.9rem; }
+    main { max-width: 620px; margin: 48px auto; padding: 0 24px 80px; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; color: var(--text-1); }
+    .subtitle { font-size: 0.95rem; color: var(--text-2); margin-bottom: 36px; }
+    h2 { font-size: 1.0rem; font-weight: 600; color: var(--text-1); margin-top: 32px; margin-bottom: 8px; }
+    p { font-size: 0.92rem; color: var(--text-2); margin-bottom: 12px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+
+    /* ── Contact form ── */
+    .form-group { margin-bottom: 18px; }
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-1);
+      margin-bottom: 5px;
+    }
+    input[type="text"],
+    input[type="email"],
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: var(--text-1);
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+    textarea { resize: vertical; min-height: 130px; }
+    .submit-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 24px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .submit-btn:hover { background: var(--accent-dark); }
+    #form-success {
+      display: none;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-size: 0.9rem;
+      color: #166534;
+      margin-top: 16px;
+    }
+
+    /* ── Direct contact box ── */
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-top: 36px;
+      font-size: 0.88rem;
+      color: var(--text-2);
+    }
+    .contact-box strong { color: var(--text-1); display: block; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/">USG Jobs</a>
+    <span>/</span>
+    <span>Contact</span>
+  </header>
+
+  <main>
+    <h1>Contact Us</h1>
+    <p class="subtitle">Have a question, found a bug, or want to share feedback? We'd love to hear from you.</p>
+
+    <form id="contact-form" action="https://formspree.io/f/usg.job.listings@gmail.com" method="POST">
+      <div class="form-group">
+        <label for="name">Your name</label>
+        <input type="text" id="name" name="name" placeholder="Jane Smith" required />
+      </div>
+
+      <div class="form-group">
+        <label for="email">Your email</label>
+        <input type="email" id="email" name="email" placeholder="jane@example.com" required />
+      </div>
+
+      <div class="form-group">
+        <label for="subject">Subject</label>
+        <select id="subject" name="subject">
+          <option value="feedback">General feedback</option>
+          <option value="bug">Bug report</option>
+          <option value="missing-job">Missing or incorrect job listing</option>
+          <option value="account">Account or billing question</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" placeholder="Tell us what's on your mind…" required></textarea>
+      </div>
+
+      <button type="submit" class="submit-btn">Send message</button>
+      <div id="form-success">✅ Thanks! We'll get back to you as soon as possible.</div>
+    </form>
+
+    <script>
+      const form = document.getElementById('contact-form');
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const data = new FormData(form);
+        try {
+          const res = await fetch(form.action, {
+            method: 'POST',
+            body: data,
+            headers: { 'Accept': 'application/json' }
+          });
+          if (res.ok) {
+            form.reset();
+            document.getElementById('form-success').style.display = 'block';
+          }
+        } catch(err) {
+          // Fallback: open email client
+          window.location.href = 'mailto:usg.job.listings@gmail.com?subject=USG%20Jobs%20Feedback';
+        }
+      });
+    </script>
+
+    <hr />
+
+    <div class="contact-box">
+      <strong>Prefer email?</strong>
+      Write directly to <a href="mailto:usg.job.listings@gmail.com">usg.job.listings@gmail.com</a> — we typically respond within 1–2 business days.
+    </div>
+
+    <h2>Reporting a missing or stale job listing</h2>
+    <p>Job data is refreshed daily from official USG institution portals. If a listing appears outdated or a job you know is open isn't showing up, please email us with the job title and institution and we'll look into it.</p>
+
+    <h2>For institutions</h2>
+    <p>If you represent a USG institution and have questions about how your job listings appear on this site, please reach out and we'll respond promptly.</p>
+
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — USG Jobs</title>
+  <meta name="description" content="USG Jobs is an independent job board aggregating publicly available positions from all 26 University System of Georgia institutions in one searchable place." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:           #f9fafb;
+      --surface:      #ffffff;
+      --text-1:       #111827;
+      --text-2:       #4b5563;
+      --text-3:       #9ca3af;
+      --accent:       #2563eb;
+      --accent-dark:  #1d4ed8;
+      --border:       #e5e7eb;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text-1);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.7;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header a { font-size: 1.1rem; font-weight: 700; color: var(--accent); text-decoration: none; }
+    header a:hover { color: var(--accent-dark); }
+    header span { color: var(--text-3); font-size: 0.9rem; }
+    main { max-width: 740px; margin: 48px auto; padding: 0 24px 80px; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; color: var(--text-1); }
+    h2 { font-size: 1.05rem; font-weight: 700; color: var(--text-1); margin-top: 36px; margin-bottom: 10px; }
+    p { font-size: 0.92rem; color: var(--text-2); margin-bottom: 12px; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    ul li { font-size: 0.92rem; color: var(--text-2); margin-bottom: 6px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 28px 0;
+    }
+    .stat-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+      text-align: center;
+    }
+    .stat-box .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+    .stat-box .lbl { font-size: 0.78rem; color: var(--text-3); margin-top: 2px; }
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-top: 36px;
+      font-size: 0.88rem;
+      color: var(--text-2);
+    }
+    .contact-box strong { color: var(--text-1); }
+    @media (max-width: 500px) {
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/">USG Jobs</a>
+    <span>/</span>
+    <span>About</span>
+  </header>
+
+  <main>
+    <h1>About USG Jobs</h1>
+
+    <p>USG Jobs is an independent job board that collects and organizes publicly available job postings from all 26 institutions of the University System of Georgia (USG) into one searchable, filterable place.</p>
+
+    <p>Before this site existed, job seekers interested in working at a USG institution had to visit each university's career portal separately — checking UGA, Georgia Tech, Kennesaw State, Augusta University, and more one by one. USG Jobs eliminates that friction.</p>
+
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="num">26</div>
+        <div class="lbl">USG institutions covered</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">3,000+</div>
+        <div class="lbl">open positions listed</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">Daily</div>
+        <div class="lbl">data refresh</div>
+      </div>
+    </div>
+
+    <h2>Who built this?</h2>
+    <p>USG Jobs was built by Carolina Salge, an independent developer with a connection to the University System of Georgia. The project started as a personal tool and grew into a full job board after realizing how fragmented the USG hiring landscape is for job seekers.</p>
+
+    <h2>How it works</h2>
+    <p>Each day, automated scrapers visit the career portals of every USG institution and collect newly posted positions. The data is cleaned, standardized, and published to this site so you can search across all institutions at once.</p>
+    <p>Sources include:</p>
+    <ul>
+      <li><strong>OneHCM / PeopleSoft</strong> — the shared HR platform used by most USG institutions</li>
+      <li><strong>UGA PeopleAdmin</strong> — University of Georgia's dedicated hiring portal</li>
+      <li><strong>Georgia Tech's career portal</strong> — scraped separately due to a distinct site configuration</li>
+      <li><strong>Georgia State University</strong> — Taleo and Faculty Careers portals</li>
+    </ul>
+    <p>All job data comes directly from official USG institution sources. USG Jobs does not create, modify, or editorialize job postings — we simply surface them in one place.</p>
+
+    <h2>What USG Jobs is not</h2>
+    <p>USG Jobs is an independent, third-party platform. It is <strong>not affiliated with, endorsed by, or operated by</strong> the University System of Georgia, the Board of Regents, or any individual USG institution. For the most current and authoritative information on any position, always verify on the institution's official career portal.</p>
+
+    <h2>Features</h2>
+    <ul>
+      <li>Search across all USG institutions simultaneously</li>
+      <li>Filter by institution, location, job type, category, salary range, and posting date</li>
+      <li>Save favorite listings with a star</li>
+      <li>Share job listings directly</li>
+      <li>Weekly job alert emails (free)</li>
+      <li>Daily alerts, CV matching, AI career coaching, and application tracking (Pro — $7/month)</li>
+    </ul>
+
+    <h2>Data accuracy</h2>
+    <p>Job listings are refreshed daily, but there may be a lag between when a position is posted or closed on the official portal and when it appears or disappears here. Always check the official posting before applying. If you notice a listing that appears stale or incorrect, please let us know.</p>
+
+    <hr />
+
+    <div class="contact-box">
+      <strong>Questions, feedback, or bug reports?</strong><br />
+      Reach us at <a href="mailto:usg.job.listings@gmail.com">usg.job.listings@gmail.com</a> or visit our <a href="/contact.html">contact page</a>.
+    </div>
+
+  </main>
+
+</body>
+</html>
