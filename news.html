@@ -103,7 +103,7 @@
   <main>
     <h1 class="page-title">USG News</h1>
     <p class="page-sub">Official news and press releases from the University System of Georgia — policy updates, research announcements, hiring news, and more.</p>
-    <p class="source-note">Sourced from <a href="https://www.usg.edu/news/" target="_blank" rel="noopener">usg.edu/news</a> · Updates automatically on page load</p>
+    <p class="source-note">Sourced from <a href="https://www.usg.edu/news/" target="_blank" rel="noopener">usg.edu/news</a> · Refreshed daily by automated scraper &nbsp;<span id="last-updated" style="color:var(--text-3);"></span></p>
 
     <div id="stats-bar" class="stats-bar" style="display:none;">
       <div class="stat"><div class="stat-val" id="stat-count">—</div><div class="stat-lbl">Articles loaded</div></div>
@@ -144,18 +144,8 @@
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const PER_PAGE = 12;
-
-// RSS feed candidates — tried in order until one succeeds
-const RSS_CANDIDATES = [
-  'https://www.usg.edu/news/rss',
-  'https://www.usg.edu/news/feed',
-  'https://www.usg.edu/rss/news',
-  'https://www.usg.edu/feed',
-];
-
-// rss2json.com converts any RSS to CORS-friendly JSON (10k req/month free)
-const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
+const PER_PAGE    = 12;
+const DATA_URL    = '/news_data.json';   // served from repo root via GitHub Pages
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let allArticles = [];
@@ -163,27 +153,22 @@ let filtered    = [];
 let currentPage = 1;
 let activeTab   = 'all';
 
-// ── Category detection ────────────────────────────────────────────────────────
-function detectCategory(title, desc) {
-  const t = (title + ' ' + desc).toLowerCase();
-  if (/hir|employ|staff|faculty|job|position|recruit|workforce|hr |human resource/.test(t)) return 'hiring';
-  if (/research|grant|study|scientist|lab|clinical|discovery|innovation|stem/.test(t)) return 'research';
-  if (/regent|board|policy|chancellor|budget|legislat|approv|vote|tuition|fee/.test(t)) return 'policy';
-  if (/student|enrollment|graduat|degree|campus|academic|admission|scholarship/.test(t)) return 'student';
-  if (/fund|award|million|grant|gift|donat|invest|endow/.test(t)) return 'funding';
-  return 'general';
-}
-
+// ── Category labels ───────────────────────────────────────────────────────────
 const CAT_LABELS = {
-  hiring: '👥 Hiring & HR', research: '🔬 Research', policy: '🏛️ Policy',
-  student: '🎓 Students', funding: '💰 Funding', general: '📰 News'
+  hiring:  '👥 Hiring & HR',
+  research:'🔬 Research',
+  policy:  '🏛️ Policy',
+  student: '🎓 Students',
+  funding: '💰 Funding',
+  general: '📰 News',
 };
 
 // ── Date formatting ───────────────────────────────────────────────────────────
 function fmtDate(raw) {
   if (!raw) return '';
   try {
-    const d = new Date(raw);
+    // Append T00:00 so Safari parses YYYY-MM-DD correctly
+    const d = new Date(raw.length === 10 ? raw + 'T00:00:00' : raw);
     if (isNaN(d)) return raw;
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch { return raw; }
@@ -192,34 +177,29 @@ function fmtDate(raw) {
 function relativeDate(raw) {
   if (!raw) return '';
   try {
-    const d = new Date(raw);
+    const d    = new Date(raw.length === 10 ? raw + 'T00:00:00' : raw);
     const diff = Date.now() - d.getTime();
     const days = Math.floor(diff / 86400000);
     if (days === 0) return 'Today';
     if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days}d ago`;
-    if (days < 30) return `${Math.floor(days/7)}w ago`;
-    if (days < 365) return `${Math.floor(days/30)}mo ago`;
-    return `${Math.floor(days/365)}y ago`;
+    if (days < 7)  return `${days}d ago`;
+    if (days < 30) return `${Math.floor(days / 7)}w ago`;
+    if (days < 365)return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
   } catch { return ''; }
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function stripHtml(html) {
-  const d = document.createElement('div');
-  d.innerHTML = html || '';
-  return d.textContent || '';
-}
-
 function renderCard(item) {
-  const cat   = item.category;
+  const cat   = item.category || 'general';
   const label = CAT_LABELS[cat] || '📰 News';
-  const desc  = stripHtml(item.description || item.content || '').slice(0, 160).trim();
-  const date  = item.pubDate || item.published || '';
+  const desc  = (item.description || '').replace(/</g,'&lt;').slice(0, 160).trim();
+  const date  = item.pubDate || '';
+  const title = (item.title || '').replace(/</g,'&lt;');
   return `
     <div class="news-card" data-cat="${cat}">
       <div class="news-tag">${label}</div>
-      <div class="news-title"><a href="${item.link}" target="_blank" rel="noopener">${item.title}</a></div>
+      <div class="news-title"><a href="${item.link}" target="_blank" rel="noopener">${title}</a></div>
       ${desc ? `<p class="news-desc">${desc}${desc.length >= 160 ? '…' : ''}</p>` : ''}
       <div class="news-meta">
         <span class="source-badge">usg.edu</span>
@@ -244,7 +224,6 @@ function renderPage() {
 
   container.innerHTML = `<div class="news-grid">${slice.map(renderCard).join('')}</div>`;
 
-  // Pagination
   if (pages <= 1) { pgDiv.innerHTML = ''; return; }
   let btns = '';
   if (currentPage > 1) btns += `<button class="pg-btn" onclick="goPage(${currentPage-1})">← Prev</button>`;
@@ -272,117 +251,57 @@ function applyFilter(tab) {
   renderPage();
 }
 
-// ── Fetch RSS via rss2json.com ────────────────────────────────────────────────
-async function tryFeed(rssUrl) {
-  const apiUrl = RSS2JSON + encodeURIComponent(rssUrl) + '&count=100';
-  const res    = await fetch(apiUrl, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.status !== 'ok') throw new Error(data.message || 'Feed error');
-  return data.items || [];
-}
-
+// ── Load from static news_data.json ──────────────────────────────────────────
 async function loadNews() {
-  let items = null;
-  let lastErr = '';
+  try {
+    const res = await fetch(DATA_URL + '?v=' + Date.now());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const articles = data.articles || [];
 
-  for (const url of RSS_CANDIDATES) {
-    try {
-      items = await tryFeed(url);
-      if (items.length) break;
-    } catch(e) {
-      lastErr = e.message;
+    if (!articles.length) throw new Error('No articles in data file');
+
+    allArticles = articles;
+
+    // Stats bar
+    const statsBar = document.getElementById('stats-bar');
+    statsBar.style.display = 'flex';
+    document.getElementById('stat-count').textContent = allArticles.length;
+    const newest = allArticles[0]?.pubDate;
+    document.getElementById('stat-newest').textContent = newest ? fmtDate(newest) : '—';
+
+    // Show updated timestamp
+    if (data.meta?.fetched_at) {
+      const updEl = document.getElementById('last-updated');
+      if (updEl) {
+        updEl.textContent = 'Last updated: ' + fmtDate(data.meta.fetched_at);
+      }
     }
-  }
 
-  if (!items || !items.length) {
-    // Final fallback: try fetching the HTML news page and parsing headlines
-    try {
-      items = await fetchFromHtmlPage();
-    } catch(e) {
-      lastErr = e.message;
-    }
-  }
+    // Show filter tabs
+    document.getElementById('filter-tabs').style.display = 'flex';
 
-  if (!items || !items.length) {
+    // Render first page
+    filtered = allArticles;
+    renderPage();
+
+    // Wire filter tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => applyFilter(tab.dataset.cat));
+    });
+
+  } catch (err) {
     document.getElementById('news-container').innerHTML = `
       <div class="state-box">
-        <h3>Could not load USG news</h3>
-        <p>The feed may be temporarily unavailable. Visit <a href="https://www.usg.edu/news/" target="_blank" rel="noopener" style="color:var(--accent)">usg.edu/news</a> directly for the latest updates.</p>
-        <p style="margin-top:8px;font-size:0.75rem;color:var(--text-3);">Error: ${lastErr}</p>
+        <h3>USG news is being loaded for the first time</h3>
+        <p>Our automated news fetcher runs daily. If this is the first visit, the data may not be available yet.</p>
+        <p style="margin-top:12px;">
+          Visit <a href="https://www.usg.edu/news/" target="_blank" rel="noopener" style="color:var(--accent)">usg.edu/news</a>
+          directly in the meantime.
+        </p>
+        <p style="margin-top:8px;font-size:0.72rem;color:var(--text-3);">Details: ${err.message}</p>
       </div>`;
-    return;
   }
-
-  // Annotate with category
-  allArticles = items.map(item => ({
-    ...item,
-    category: detectCategory(item.title || '', item.description || item.content || '')
-  }));
-
-  // Update stats
-  const statsBar = document.getElementById('stats-bar');
-  statsBar.style.display = 'flex';
-  document.getElementById('stat-count').textContent = allArticles.length;
-  const newest = allArticles[0]?.pubDate;
-  document.getElementById('stat-newest').textContent = newest ? fmtDate(newest) : '—';
-
-  // Show filters
-  document.getElementById('filter-tabs').style.display = 'flex';
-
-  // Initial render
-  filtered = allArticles;
-  renderPage();
-
-  // Wire up tabs
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => applyFilter(tab.dataset.cat));
-  });
-}
-
-// ── HTML fallback: parse usg.edu/news directly via CORS proxy ─────────────────
-async function fetchFromHtmlPage() {
-  // Use allorigins.win as a CORS proxy to fetch the HTML news page
-  const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.usg.edu/news/');
-  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
-  const data = await res.json();
-  const html = data.contents || '';
-  return parseNewsHtml(html);
-}
-
-function parseNewsHtml(html) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const items = [];
-
-  // Try common news listing selectors
-  const selectors = [
-    'article', '.news-item', '.news-listing', '.news-entry',
-    '.listing-item', '[class*="news"]', 'li.item'
-  ];
-
-  for (const sel of selectors) {
-    const els = doc.querySelectorAll(sel);
-    if (els.length < 3) continue;
-    els.forEach(el => {
-      const linkEl  = el.querySelector('a[href]');
-      const titleEl = el.querySelector('h2, h3, h4, .title, .headline');
-      const descEl  = el.querySelector('p, .description, .summary, .excerpt');
-      const dateEl  = el.querySelector('time, .date, [class*="date"]');
-      if (!linkEl || !titleEl) return;
-      const href = linkEl.href.startsWith('http') ? linkEl.href : 'https://www.usg.edu' + linkEl.getAttribute('href');
-      items.push({
-        title: titleEl.textContent.trim(),
-        link: href,
-        description: descEl?.textContent.trim() || '',
-        pubDate: dateEl?.getAttribute('datetime') || dateEl?.textContent.trim() || '',
-      });
-    });
-    if (items.length >= 5) break;
-  }
-
-  return items;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

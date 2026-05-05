@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "fetched_at": "2025-05-05T00:00:00Z",
+    "source": "https://www.usg.edu/news/",
+    "total": 10,
+    "note": "Seed data — will be replaced automatically by the daily GitHub Action"
+  },
+  "articles": [
+    {
+      "title": "USG Board of Regents Approves FY2026 Budget Priorities",
+      "link": "https://www.usg.edu/news/",
+      "description": "The Board of Regents of the University System of Georgia approved budget priorities for fiscal year 2026, focusing on workforce development, research expansion, and student success initiatives.",
+      "pubDate": "2025-04-28",
+      "category": "policy"
+    },
+    {
+      "title": "USG Institutions See Record Research Funding in 2025",
+      "link": "https://www.usg.edu/news/",
+      "description": "University System of Georgia institutions secured a record level of external research funding in fiscal year 2025, with grants from federal agencies and private foundations spanning science, engineering, health, and the humanities.",
+      "pubDate": "2025-04-15",
+      "category": "research"
+    },
+    {
+      "title": "Chancellor Sonny Perdue Highlights Workforce Initiatives at Spring Summit",
+      "link": "https://www.usg.edu/news/",
+      "description": "At the annual spring workforce summit, USG Chancellor Sonny Perdue outlined new programs designed to align higher education credentials with Georgia's growing technology, healthcare, and advanced manufacturing sectors.",
+      "pubDate": "2025-04-10",
+      "category": "policy"
+    },
+    {
+      "title": "Georgia State University Named Among Top Public Research Universities",
+      "link": "https://www.usg.edu/news/",
+      "description": "Georgia State University has been recognized among the top public research universities in the Southeast for its work in student success, urban education, and health sciences research.",
+      "pubDate": "2025-04-02",
+      "category": "research"
+    },
+    {
+      "title": "USG Announces New Dual-Enrollment Expansion for High School Students",
+      "link": "https://www.usg.edu/news/",
+      "description": "The University System of Georgia is expanding dual-enrollment opportunities, allowing eligible Georgia high school students to earn college credit while completing their secondary education.",
+      "pubDate": "2025-03-25",
+      "category": "student"
+    },
+    {
+      "title": "USG Receives $50M Grant for STEM Workforce Pipeline",
+      "link": "https://www.usg.edu/news/",
+      "description": "A $50 million federal grant will support the University System of Georgia in building a comprehensive STEM workforce pipeline, focusing on underrepresented communities across the state.",
+      "pubDate": "2025-03-18",
+      "category": "funding"
+    },
+    {
+      "title": "New Faculty Hiring Initiative Targets STEM and Health Sciences",
+      "link": "https://www.usg.edu/news/",
+      "description": "USG institutions are launching a coordinated faculty hiring initiative to recruit top talent in high-demand fields including data science, nursing, engineering, and public health.",
+      "pubDate": "2025-03-10",
+      "category": "hiring"
+    },
+    {
+      "title": "Georgia Tech Partners with Industry on AI Research Hub",
+      "link": "https://www.usg.edu/news/",
+      "description": "Georgia Institute of Technology has announced a new public-private partnership to establish an artificial intelligence research hub, expected to create hundreds of research positions and drive economic development.",
+      "pubDate": "2025-02-28",
+      "category": "research"
+    },
+    {
+      "title": "UGA Spring Enrollment Reaches All-Time High",
+      "link": "https://www.usg.edu/news/",
+      "description": "The University of Georgia reported its highest spring enrollment on record, reflecting growing student demand for in-state higher education and expanded program offerings.",
+      "pubDate": "2025-02-14",
+      "category": "student"
+    },
+    {
+      "title": "USG Expands Mental Health Resources Across All 26 Institutions",
+      "link": "https://www.usg.edu/news/",
+      "description": "The University System of Georgia is investing in expanded mental health and counseling services across all 26 of its member institutions, responding to increased student demand for well-being support.",
+      "pubDate": "2025-02-05",
+      "category": "student"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+name: Fetch USG News
+
+on:
+  # Run every day at 8 AM ET (1 PM UTC)
+  schedule:
+    - cron: '0 13 * * *'
+
+  # Allow manual trigger from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  fetch-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests beautifulsoup4 lxml
+
+      - name: Fetch USG news from usg.edu
+        working-directory: scrapers
+        run: python fetch_usg_news.py
+
+      - name: Commit news_data.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add news_data.json
+          if git diff --cached --quiet; then
+            echo "No changes to news_data.json — skipping commit."
+          else
+            COUNT=$(python3 -c "import json; d=json.load(open('news_data.json')); print(d['meta']['total'])" 2>/dev/null || echo "?")
+            git commit -m "Auto-update USG news: ${COUNT} articles [skip ci]"
+            git fetch origin main
+            git merge -X ours origin/main --no-edit
+            git push
+          fi
