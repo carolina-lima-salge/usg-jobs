@@ -1673,6 +1673,7 @@ function render() {
 
   if (total === 0) {
     container.innerHTML = '';
+    injectJobsSchema([]);
     panel.classList.add('hidden');
     empty.classList.remove('hidden');
     document.getElementById('pagination').innerHTML = '';
@@ -1682,6 +1683,7 @@ function render() {
   panel.classList.remove('hidden');
 
   container.innerHTML = pageJobs.map(renderCard).join('');
+  injectJobsSchema(pageJobs);
 
   container.querySelectorAll('.job-row').forEach(row => {
     row.querySelector('.row-header').addEventListener('click', () => {
@@ -1701,6 +1703,99 @@ function render() {
       expandedId = null;
     }
   }
+}
+
+// ── Google for Jobs: inject JobPosting JSON-LD for visible listings ──────────
+function injectJobsSchema(jobs) {
+  const old = document.getElementById('jobs-ld-json');
+  if (old) old.remove();
+  if (!jobs || !jobs.length) return;
+
+  const EMP_TYPE = {
+    'full-time': 'FULL_TIME', 'full time': 'FULL_TIME',
+    'part-time': 'PART_TIME', 'part time': 'PART_TIME',
+    'contract':  'CONTRACTOR', 'contractor': 'CONTRACTOR',
+    'temporary': 'TEMPORARY',  'temp': 'TEMPORARY',
+    'internship':'INTERN',     'intern': 'INTERN',
+    'volunteer': 'VOLUNTEER',  'per diem': 'PER_DIEM',
+  };
+
+  function toISODate(str) {
+    if (!str) return null;
+    const d = new Date(str);
+    return isNaN(d) ? null : d.toISOString().split('T')[0];
+  }
+
+  function parseJobLocation(loc) {
+    const base = { '@type': 'PostalAddress', addressRegion: 'GA', addressCountry: 'US' };
+    if (loc) {
+      const parts = loc.split(',').map(p => p.trim());
+      if (parts[0]) base.addressLocality = parts[0];
+      if (parts[1]) base.addressRegion = parts[1].replace(/\s*\d+$/, '').trim() || 'GA';
+    }
+    return { '@type': 'Place', address: base };
+  }
+
+  function getEmploymentType(type) {
+    if (!type) return null;
+    const t = type.toLowerCase();
+    for (const [k, v] of Object.entries(EMP_TYPE)) { if (t.includes(k)) return v; }
+    return null;
+  }
+
+  function buildSalary(salary) {
+    if (!salary) return null;
+    const nums = salary.match(/[\d,]+(?:\.\d+)?/g);
+    if (!nums || !nums.length) return null;
+    const vals = nums.map(n => parseFloat(n.replace(/,/g, '')));
+    const unitText = /\/hr\b|hour/i.test(salary) ? 'HOUR'
+      : /\/mo\b|month/i.test(salary) ? 'MONTH' : 'YEAR';
+    const qv = vals.length >= 2
+      ? { '@type': 'QuantitativeValue', minValue: Math.min(...vals), maxValue: Math.max(...vals), unitText }
+      : { '@type': 'QuantitativeValue', value: vals[0], unitText };
+    return { '@type': 'MonetaryAmount', currency: 'USD', value: qv };
+  }
+
+  const schemas = jobs.map(job => {
+    const schema = {
+      '@context': 'https://schema.org',
+      '@type': 'JobPosting',
+      title: job.title || 'Open Position',
+      description: job.summary
+        ? job.summary
+        : `${job.title || 'Open position'} at ${job.institution || 'a University System of Georgia institution'}${job.location ? ' in ' + job.location : ''}.`,
+      hiringOrganization: {
+        '@type': 'Organization',
+        name: job.institution || 'University System of Georgia',
+        sameAs: 'https://www.usg.edu/',
+      },
+      jobLocation: parseJobLocation(job.location),
+      identifier: { '@type': 'PropertyValue', name: 'USG Jobs', value: job.id },
+    };
+
+    const datePosted = toISODate(job.posted);
+    if (datePosted) schema.datePosted = datePosted;
+    const validThrough = toISODate(job.closes);
+    if (validThrough) schema.validThrough = validThrough;
+
+    const empType = getEmploymentType(job.type);
+    if (empType) schema.employmentType = empType;
+    if (job.remote) schema.jobLocationType = 'TELECOMMUTE';
+
+    const applyUrl = job.apply || job.view;
+    if (applyUrl) schema.url = applyUrl;
+
+    const salary = buildSalary(job.salary);
+    if (salary) schema.baseSalary = salary;
+
+    return schema;
+  });
+
+  const el = document.createElement('script');
+  el.id   = 'jobs-ld-json';
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(schemas);
+  document.head.appendChild(el);
 }
 
 function renderCard(job) {
