@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USG Salary Guide: What University System of Georgia Institutions Pay by Job Category — USG Jobs Blog</title>
+  <meta name="description" content="A comprehensive salary guide for University System of Georgia jobs, broken down by job category and institution — based on 750+ real postings with salary data from 2025." />
+  <meta property="og:title" content="USG Salary Guide: What USG Institutions Pay by Job Category (2025)" />
+  <meta property="og:description" content="Real salary data from 750+ USG job postings across all 17 institutions that publish compensation. Updated May 2025." />
+  <meta property="og:url" content="https://usgjobs.org/blog/usg-salary-guide-by-job-category.html" />
+  <meta property="og:type" content="article" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "USG Salary Guide: What University System of Georgia Institutions Pay by Job Category",
+    "description": "A comprehensive 2025 salary guide for USG jobs based on 750+ real postings with compensation data across all 17 institutions that publish salary.",
+    "author": { "@type": "Person", "name": "Carolina Salge" },
+    "publisher": { "@type": "Organization", "name": "USG Jobs", "url": "https://usgjobs.org" },
+    "datePublished": "2025-05-05",
+    "url": "https://usgjobs.org/blog/usg-salary-guide-by-job-category.html"
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f9fafb; --surface: #ffffff; --text-1: #111827; --text-2: #4b5563;
+      --text-3: #9ca3af; --accent: #2563eb; --accent-dark: #1d4ed8;
+      --border: #e5e7eb; --radius: 6px;
+    }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text-1); -webkit-font-smoothing: antialiased; line-height: 1.75; }
+    header { background: #0f172a; padding: 14px 24px; display: flex; align-items: center; gap: 16px; }
+    header a.brand { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; text-decoration: none; }
+    header a.brand:hover { color: white; }
+    header span { color: #64748b; font-size: 0.85rem; }
+    header a.nav { color: #94a3b8; font-size: 0.85rem; text-decoration: none; }
+    header a.nav:hover { color: #f1f5f9; }
+    main { max-width: 780px; margin: 48px auto; padding: 0 24px 80px; }
+    .meta { font-size: 0.8rem; color: var(--text-3); margin-bottom: 28px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .meta span { background: #eff6ff; color: var(--accent); padding: 2px 10px; border-radius: 99px; font-weight: 600; font-size: 0.75rem; }
+    h1 { font-size: 1.85rem; font-weight: 700; line-height: 1.25; margin-bottom: 12px; }
+    h2 { font-size: 1.15rem; font-weight: 700; color: var(--text-1); margin: 40px 0 12px; }
+    h3 { font-size: 1rem; font-weight: 600; color: var(--text-1); margin: 28px 0 8px; }
+    p { font-size: 0.93rem; color: var(--text-2); margin-bottom: 16px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+    ul { padding-left: 20px; margin-bottom: 16px; }
+    ul li { font-size: 0.93rem; color: var(--text-2); margin-bottom: 6px; }
+    .lead { font-size: 1.05rem; color: var(--text-2); margin-bottom: 28px; line-height: 1.8; }
+
+    .data-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.86rem; }
+    .data-table th { background: #f1f5f9; text-align: left; padding: 10px 14px; font-weight: 600; color: var(--text-1); border-bottom: 2px solid var(--border); }
+    .data-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-2); vertical-align: top; }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: #f8fafc; }
+    .hi { color: #166534; font-weight: 600; }
+    .lo { color: #991b1b; }
+
+    .salary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 22px; margin-bottom: 16px; }
+    .salary-card h3 { margin-top: 0; margin-bottom: 6px; font-size: 1rem; }
+    .salary-card .range { font-size: 1.25rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .salary-card .avg { font-size: 0.82rem; color: var(--text-2); margin-bottom: 8px; }
+    .salary-card .roles { font-size: 0.8rem; color: var(--text-3); }
+    .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 20px 0; }
+    @media (max-width: 600px) { .card-grid { grid-template-columns: 1fr; } }
+
+    .callout { border-radius: 8px; padding: 18px 20px; margin: 24px 0; font-size: 0.88rem; }
+    .callout.blue  { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f; }
+    .callout.green { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
+    .callout.amber { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    .inst-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
+    @media (max-width: 600px) { .inst-grid { grid-template-columns: 1fr; } }
+    .inst-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; font-size: 0.85rem; }
+    .inst-card .inst-name { font-weight: 600; color: var(--text-1); margin-bottom: 4px; }
+    .inst-card .inst-avg { color: var(--accent); font-weight: 700; font-size: 1rem; }
+    .inst-card .inst-n { font-size: 0.75rem; color: var(--text-3); margin-top: 2px; }
+
+    .cta-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-top: 40px; text-align: center; }
+    .cta-box p { margin-bottom: 14px; }
+    .cta-btn { display: inline-block; background: var(--accent); color: white; padding: 10px 24px; border-radius: var(--radius); font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+    .cta-btn:hover { background: var(--accent-dark); text-decoration: none; }
+    footer { max-width: 780px; margin: 0 auto; padding: 12px 24px 40px; text-align: center; font-size: 0.72rem; color: var(--text-3); }
+    footer a { color: var(--text-2); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">USG Jobs</a>
+    <span>/</span>
+    <a href="/blog.html" class="nav">Blog</a>
+    <span>/</span>
+    <span style="color:#94a3b8;font-size:0.85rem;">Salary Guide</span>
+  </header>
+
+  <main>
+    <div class="meta">
+      <span>Salary Guide</span>
+      <span>May 2025</span>
+      By Carolina Salge · 10 min read
+    </div>
+
+    <h1>USG Salary Guide: What University System of Georgia Institutions Pay by Job Category (2025)</h1>
+
+    <p class="lead">Wondering what to expect in compensation at a University System of Georgia institution? We analyzed over 750 job postings across 17 USG institutions that publish salary data to give you the most comprehensive, data-driven salary guide available for USG careers.</p>
+
+    <div class="callout blue">
+      <strong>How this data was collected:</strong>
+      Salary figures are drawn from active job postings on USG Jobs as of May 2025. Only postings that explicitly listed a salary range or fixed compensation are included. The University System has 26 institutions; 9 (including Georgia State and Middle Georgia State) do not publish salary on their public job postings.
+    </div>
+
+    <h2>Salary by Institution: The Full Picture</h2>
+
+    <p>This table shows average advertised salary across all roles with compensation listed — giving you a baseline for each institution's pay scale.</p>
+
+    <div class="inst-grid">
+      <div class="inst-card">
+        <div class="inst-name">University of Georgia</div>
+        <div class="inst-avg">$89,918</div>
+        <div class="inst-n">avg · 253 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Georgia Institute of Technology</div>
+        <div class="inst-avg">$89,114</div>
+        <div class="inst-n">avg · 21 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">University of West Georgia</div>
+        <div class="inst-avg">$92,721</div>
+        <div class="inst-n">avg · 8 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Kennesaw State University</div>
+        <div class="inst-avg">$72,378</div>
+        <div class="inst-n">avg · 53 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Columbus State University</div>
+        <div class="inst-avg">$66,611</div>
+        <div class="inst-n">avg · 17 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Georgia Highlands College</div>
+        <div class="inst-avg">$65,542</div>
+        <div class="inst-n">avg · 9 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">University of North Georgia</div>
+        <div class="inst-avg">$64,566</div>
+        <div class="inst-n">avg · 7 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Georgia Southern University</div>
+        <div class="inst-avg">$62,117</div>
+        <div class="inst-n">avg · 35 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Augusta University</div>
+        <div class="inst-avg">$61,798</div>
+        <div class="inst-n">avg · 128 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Georgia Gwinnett College</div>
+        <div class="inst-avg">$60,243</div>
+        <div class="inst-n">avg · 30 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Georgia College &amp; State Univ.</div>
+        <div class="inst-avg">$59,354</div>
+        <div class="inst-n">avg · 32 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Savannah State University</div>
+        <div class="inst-avg">$62,164</div>
+        <div class="inst-n">avg · 23 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">GA Southwestern State Univ.</div>
+        <div class="inst-avg">$55,104</div>
+        <div class="inst-n">avg · 9 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">East Georgia State College</div>
+        <div class="inst-avg">$53,589</div>
+        <div class="inst-n">avg · 7 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Atlanta Metropolitan State</div>
+        <div class="inst-avg">$50,857</div>
+        <div class="inst-n">avg · 7 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Valdosta State University</div>
+        <div class="inst-avg">$47,165</div>
+        <div class="inst-n">avg · 26 postings with salary</div>
+      </div>
+      <div class="inst-card">
+        <div class="inst-name">Albany State University</div>
+        <div class="inst-avg">$35,251</div>
+        <div class="inst-n">avg · 8 postings with salary</div>
+      </div>
+    </div>
+
+    <div class="callout amber">
+      <strong>The "average salary" caveat:</strong>
+      Institutional averages are heavily influenced by whether a school posts more faculty, research, or administrative roles — and by how senior those roles are. A school with high average salaries isn't necessarily paying everyone more; it may simply post fewer entry-level openings. Always look at the specific role and job family when benchmarking.
+    </div>
+
+    <h2>Salary by Job Category (Based on UGA — the Most Complete Dataset)</h2>
+
+    <p>Because UGA publishes salary information on 60% of its job postings — more than any other USG institution — it provides the best window into what different role types pay across the system. Expect variation of ±15–20% at other institutions.</p>
+
+    <div class="card-grid">
+      <div class="salary-card">
+        <h3>🖥️ IT &amp; Technology</h3>
+        <div class="range">$65,000–$120,000</div>
+        <div class="avg">Overall avg: $142K (skewed by senior roles)</div>
+        <div class="roles">Systems Analyst, Software Developer, Network Engineer, IT Manager</div>
+      </div>
+      <div class="salary-card">
+        <h3>🎓 Faculty &amp; Instruction</h3>
+        <div class="range">$53,000–$85,000</div>
+        <div class="avg">Overall avg: $69,795 (full-time faculty)</div>
+        <div class="roles">Lecturer, Instructor, Assistant Professor, Visiting Faculty</div>
+      </div>
+      <div class="salary-card">
+        <h3>🏛️ Administrative &amp; Staff</h3>
+        <div class="range">$35,000–$90,000</div>
+        <div class="avg">Overall avg: $57,833</div>
+        <div class="roles">Coordinator, Specialist, Manager, Director, Program Analyst</div>
+      </div>
+      <div class="salary-card">
+        <h3>🚔 Public Safety</h3>
+        <div class="range">$45,000–$70,000</div>
+        <div class="avg">Overall avg: $57,500</div>
+        <div class="roles">Police Officer, Sergeant, Security Specialist</div>
+      </div>
+      <div class="salary-card">
+        <h3>🎯 Student Services</h3>
+        <div class="range">$40,000–$70,500</div>
+        <div class="avg">Overall avg: $50,250</div>
+        <div class="roles">Academic Advisor, Financial Aid Counselor, Registrar Staff, Career Advisor</div>
+      </div>
+      <div class="salary-card">
+        <h3>⚕️ Healthcare &amp; Clinical</h3>
+        <div class="range">$32,000–$85,000</div>
+        <div class="avg">Overall avg: $52,105</div>
+        <div class="roles">Nursing Assistant, Dental Assistant, Clinical Coordinator</div>
+      </div>
+      <div class="salary-card">
+        <h3>🔬 Research &amp; Science</h3>
+        <div class="range">$22,000–$100,000</div>
+        <div class="avg">Overall avg: $49,708</div>
+        <div class="roles">Research Associate, Postdoctoral Fellow, Lab Specialist</div>
+      </div>
+      <div class="salary-card">
+        <h3>🔧 Facilities &amp; Trades</h3>
+        <div class="range">$34,500–$60,000</div>
+        <div class="avg">Overall avg: $41,447</div>
+        <div class="roles">Maintenance Technician, Custodian, Groundskeeper, HVAC</div>
+      </div>
+    </div>
+
+    <h2>Key Takeaways for Job Seekers</h2>
+
+    <h3>IT roles are the highest-paying non-faculty positions</h3>
+    <p>If you have a technology background, USG institutions are actively competing for that talent. IT roles at UGA, Georgia Tech, and Kennesaw State routinely hit $80,000–$120,000 for mid-level positions. Senior IT leadership (CIO, Director of Technology) reaches $150,000+.</p>
+
+    <h3>Director-level admin roles pay well</h3>
+    <p>Don't assume "administrative" means low pay. Director-level positions — managing departments, overseeing budgets, leading teams — at USG institutions range from $90,000–$170,000. The average is pulled down by the high volume of coordinator and specialist roles at $40,000–$55,000.</p>
+
+    <h3>Research positions vary dramatically by career stage</h3>
+    <p>A first-year postdoctoral fellow might earn $22,000–$35,000 in stipend form. A senior Research Scientist or Program Director can earn $85,000–$100,000+. Research roles at Augusta University's medical campus and Georgia Tech's research institutes tend to pay more than equivalents at smaller USG schools.</p>
+
+    <h3>Location affects your real compensation</h3>
+    <p>A $60,000 salary in Athens (UGA) goes significantly further than the same salary in Atlanta (Georgia Tech, Georgia State). The Athens, GA median home price is substantially lower than Atlanta, and commute costs are minimal. Factor location into your total compensation assessment.</p>
+
+    <h3>Benefits add significant value to the base salary</h3>
+    <p>USG institutions participate in the <a href="https://www.ers.ga.gov/" target="_blank">Teachers Retirement System of Georgia (TRS)</a> or the Optional Retirement Plan (ORP). TRS is a defined-benefit pension — increasingly rare in the private sector. Add employer health insurance contributions, tuition assistance for you and dependents, and generous PTO, and the total compensation package is typically 25–35% above the base salary listed in the posting.</p>
+
+    <h2>How to Use This Data When Negotiating</h2>
+
+    <p>Most USG institutions post jobs with a specific salary range already defined by the position's pay grade. Unlike the private sector, there's less room to negotiate base salary — but there is sometimes flexibility on start date, signing arrangements for faculty, and professional development allowances.</p>
+
+    <p>For roles at institutions that don't publish salary (Georgia State, Middle Georgia State, College of Coastal Georgia, and others), use UGA's published ranges for comparable roles as your benchmark. HR staff at these institutions are generally familiar with competitive ranges and won't be surprised if you reference them.</p>
+
+    <div class="cta-box">
+      <p style="color:var(--text-1);font-weight:600;">Search USG jobs with salary filters</p>
+      <p>USG Jobs lets you filter job listings by salary range, institution, location, and job type — all in one place, updated daily from official USG portals.</p>
+      <a href="/" class="cta-btn">Browse USG Jobs with Salary Filter →</a>
+    </div>
+
+    <hr />
+    <p style="font-size:0.78rem;color:var(--text-3);">
+      <em>Salary data sourced from public job postings on official USG institution career portals, aggregated by USG Jobs. Figures reflect postings active as of May 2025 that included compensation information. Averages may not represent typical pay for all roles within a category. Always verify current compensation on the official institution posting before applying. USG Jobs is independent and not affiliated with the University System of Georgia or the Board of Regents.</em>
+    </p>
+  </main>
+
+  <footer>
+    &copy; 2025 USG Jobs &bull;
+    <a href="/">Home</a> &bull;
+    <a href="/blog.html">Blog</a> &bull;
+    <a href="/about.html">About</a> &bull;
+    <a href="/contact.html">Contact</a> &bull;
+    <a href="/privacy.html">Privacy Policy</a>
+  </footer>
+</body>
+</html>

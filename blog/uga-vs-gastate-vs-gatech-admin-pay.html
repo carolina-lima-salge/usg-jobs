@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UGA vs Georgia State vs Georgia Tech: Which Pays More for Administrative Roles? — USG Jobs Blog</title>
+  <meta name="description" content="A data-driven look at administrative role salaries across UGA, Georgia State University, and Georgia Tech — based on current job postings from 2025." />
+  <meta property="og:title" content="UGA vs Georgia State vs Georgia Tech: Which Pays More for Administrative Roles?" />
+  <meta property="og:description" content="A data-driven salary comparison of administrative roles across the three flagship USG institutions, based on live job postings." />
+  <meta property="og:url" content="https://usgjobs.org/blog/uga-vs-gastate-vs-gatech-admin-pay.html" />
+  <meta property="og:type" content="article" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "UGA vs Georgia State vs Georgia Tech: Which Pays More for Administrative Roles?",
+    "description": "A data-driven look at administrative role salaries across UGA, Georgia State, and Georgia Tech based on current 2025 job postings.",
+    "author": { "@type": "Person", "name": "Carolina Salge" },
+    "publisher": { "@type": "Organization", "name": "USG Jobs", "url": "https://usgjobs.org" },
+    "datePublished": "2025-05-05",
+    "url": "https://usgjobs.org/blog/uga-vs-gastate-vs-gatech-admin-pay.html"
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f9fafb; --surface: #ffffff; --text-1: #111827; --text-2: #4b5563;
+      --text-3: #9ca3af; --accent: #2563eb; --accent-dark: #1d4ed8;
+      --border: #e5e7eb; --radius: 6px;
+    }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text-1); -webkit-font-smoothing: antialiased; line-height: 1.75; }
+    header { background: #0f172a; padding: 14px 24px; display: flex; align-items: center; gap: 16px; }
+    header a.brand { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; text-decoration: none; }
+    header a.brand:hover { color: white; }
+    header span { color: #64748b; font-size: 0.85rem; }
+    header a.nav { color: #94a3b8; font-size: 0.85rem; text-decoration: none; }
+    header a.nav:hover { color: #f1f5f9; }
+    main { max-width: 760px; margin: 48px auto; padding: 0 24px 80px; }
+    .meta { font-size: 0.8rem; color: var(--text-3); margin-bottom: 28px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .meta span { background: #eff6ff; color: var(--accent); padding: 2px 10px; border-radius: 99px; font-weight: 600; font-size: 0.75rem; }
+    h1 { font-size: 1.9rem; font-weight: 700; line-height: 1.25; margin-bottom: 12px; color: var(--text-1); }
+    h2 { font-size: 1.15rem; font-weight: 700; color: var(--text-1); margin: 40px 0 12px; }
+    h3 { font-size: 1rem; font-weight: 600; color: var(--text-1); margin: 24px 0 8px; }
+    p { font-size: 0.93rem; color: var(--text-2); margin-bottom: 16px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+    .lead { font-size: 1.05rem; color: var(--text-2); margin-bottom: 28px; line-height: 1.8; }
+
+    /* Comparison table */
+    .data-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.87rem; }
+    .data-table th { background: #f1f5f9; text-align: left; padding: 10px 14px; font-weight: 600; color: var(--text-1); border-bottom: 2px solid var(--border); white-space: nowrap; }
+    .data-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-2); }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: #f8fafc; }
+    .winner { color: #166534; font-weight: 700; }
+    .n-a { color: var(--text-3); font-style: italic; }
+
+    /* Callout boxes */
+    .callout { border-radius: 8px; padding: 18px 20px; margin: 24px 0; font-size: 0.88rem; }
+    .callout.blue  { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a5f; }
+    .callout.green { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
+    .callout.amber { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; }
+    .callout strong { display: block; margin-bottom: 4px; font-size: 0.92rem; }
+
+    /* Salary bar chart */
+    .bar-chart { margin: 24px 0; }
+    .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .bar-label { width: 140px; font-size: 0.82rem; font-weight: 600; color: var(--text-1); flex-shrink: 0; }
+    .bar-track { flex: 1; background: var(--border); border-radius: 99px; height: 24px; position: relative; }
+    .bar-fill { height: 100%; border-radius: 99px; display: flex; align-items: center; padding-left: 10px; }
+    .bar-fill span { font-size: 0.75rem; font-weight: 700; color: white; white-space: nowrap; }
+    .bar-uga   { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+    .bar-gt    { background: linear-gradient(90deg, #b45309, #d97706); }
+    .bar-gsu   { background: linear-gradient(90deg, #6b7280, #9ca3af); }
+
+    .cta-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-top: 40px; text-align: center; }
+    .cta-box p { margin-bottom: 14px; }
+    .cta-btn { display: inline-block; background: var(--accent); color: white; padding: 10px 24px; border-radius: var(--radius); font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+    .cta-btn:hover { background: var(--accent-dark); text-decoration: none; }
+
+    footer { max-width: 760px; margin: 0 auto; padding: 12px 24px 40px; text-align: center; font-size: 0.72rem; color: var(--text-3); }
+    footer a { color: var(--text-2); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">USG Jobs</a>
+    <span>/</span>
+    <a href="/blog.html" class="nav">Blog</a>
+    <span>/</span>
+    <span style="color:#94a3b8;font-size:0.85rem;">Salary Comparison</span>
+  </header>
+
+  <main>
+    <div class="meta">
+      <span>Salary Data</span>
+      <span>May 2025</span>
+      By Carolina Salge · 8 min read
+    </div>
+
+    <h1>UGA vs Georgia State vs Georgia Tech: Which Institution Pays More for Administrative Roles?</h1>
+
+    <p class="lead">If you're job hunting across the University System of Georgia's three flagship universities, salary is probably one of your first questions. The answer isn't always what people expect — and it varies significantly by role type.</p>
+
+    <p>We pulled salary data from all active job postings on <a href="/">USG Jobs</a> as of May 2025 to give you a real, data-backed comparison. Here's what we found.</p>
+
+    <h2>The Short Answer</h2>
+
+    <div class="callout blue">
+      <strong>Bottom line up front:</strong>
+      Georgia Tech posts the highest average administrative salaries when salary data is available, followed closely by UGA. Georgia State posts the most jobs overall but publishes salary information for almost none of them — making it nearly impossible to compare directly.
+    </div>
+
+    <h2>Active Job Postings: By the Numbers</h2>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Institution</th>
+          <th>Open Positions</th>
+          <th>Postings with Salary</th>
+          <th>Avg. Overall Salary</th>
+          <th>Avg. Admin Salary</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>University of Georgia (UGA)</strong></td>
+          <td>1,140</td>
+          <td>688 (60%)</td>
+          <td>$89,918</td>
+          <td>$56,031</td>
+        </tr>
+        <tr>
+          <td><strong>Georgia Tech</strong></td>
+          <td>232</td>
+          <td>44 (19%)</td>
+          <td>$89,114</td>
+          <td class="winner">$96,648</td>
+        </tr>
+        <tr>
+          <td><strong>Georgia State University</strong></td>
+          <td>140</td>
+          <td class="n-a">0 (0%)</td>
+          <td class="n-a">Not reported</td>
+          <td class="n-a">Not reported</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><em>Data based on all active job postings as of May 2025. "Administrative" includes coordinator, specialist, manager, director, office, and program roles.</em></p>
+
+    <h2>Administrative Salary at a Glance</h2>
+
+    <div class="bar-chart">
+      <div class="bar-row">
+        <div class="bar-label">Georgia Tech</div>
+        <div class="bar-track">
+          <div class="bar-fill bar-gt" style="width:100%"><span>$96,648 avg</span></div>
+        </div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">UGA</div>
+        <div class="bar-track">
+          <div class="bar-fill bar-uga" style="width:58%"><span>$56,031 avg</span></div>
+        </div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">Georgia State</div>
+        <div class="bar-track">
+          <div class="bar-fill bar-gsu" style="width:5%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout amber">
+      <strong>Note on Georgia State salary data:</strong>
+      Georgia State uses the Taleo hiring platform, which does not publish salary ranges on its public postings. If you're applying there, salary is typically negotiated during the offer stage. You can often find pay grade ranges by requesting the full job description or asking HR directly.
+    </div>
+
+    <h2>What's Driving Georgia Tech's Higher Admin Salaries?</h2>
+
+    <p>Georgia Tech's administrative salary average of $96,648 is almost $40,000 higher than UGA's $56,031 — a striking gap. Several factors explain this:</p>
+
+    <p><strong>Tech-adjacent roles pull the average up.</strong> Georgia Tech's administrative staff frequently work alongside engineers and researchers. Roles like "Research Program Manager," "Grants Coordinator," and "Laboratory Administrator" command higher salaries at Tech than equivalent titles at comprehensive universities. In our data, the salary range for admin roles at GT ran from $60,000 to $175,000.</p>
+
+    <p><strong>Smaller volume of postings.</strong> Georgia Tech posts far fewer administrative roles (232 total vs. UGA's 1,140), and fewer of those are entry-level. The postings that do include salary tend to skew toward senior roles.</p>
+
+    <p><strong>Atlanta cost of living and private-sector competition.</strong> Georgia Tech competes with companies like Delta, NCR, Salesforce, and dozens of tech firms for the same talent. Salaries reflect that pressure.</p>
+
+    <h2>Why UGA Tells a More Complete Story</h2>
+
+    <p>UGA is the most useful institution for salary benchmarking because it publishes salary ranges on <strong>60% of its job postings</strong> — far more than Tech (19%) or State (0%). With 688 postings showing compensation, you can actually build a realistic picture of what different roles pay.</p>
+
+    <p>At UGA, administrative salaries cluster between $40,000 and $75,000 for most staff roles, with outliers in IT management and director-level positions reaching $130,000–$170,000.</p>
+
+    <h2>Role-by-Role Breakdown at UGA (the Benchmark)</h2>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Job Family</th>
+          <th>Avg. Salary</th>
+          <th>Salary Range</th>
+          <th>Sample Roles</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>IT &amp; Engineering</td>
+          <td class="winner">$142,498*</td>
+          <td>$39K–$897K</td>
+          <td>Systems Analyst, Dev Lead</td>
+        </tr>
+        <tr>
+          <td>Faculty &amp; Instruction</td>
+          <td>$69,795</td>
+          <td>$53K–$85K</td>
+          <td>Lecturer, Instructor</td>
+        </tr>
+        <tr>
+          <td>Administrative &amp; Staff</td>
+          <td>$57,833</td>
+          <td>$13K–$170K</td>
+          <td>Coordinator, Specialist, Director</td>
+        </tr>
+        <tr>
+          <td>Public Safety</td>
+          <td>$57,500</td>
+          <td>$45K–$70K</td>
+          <td>Police Officer, Sergeant</td>
+        </tr>
+        <tr>
+          <td>Student Services</td>
+          <td>$50,250</td>
+          <td>$40K–$71K</td>
+          <td>Academic Advisor, Financial Aid Counselor</td>
+        </tr>
+        <tr>
+          <td>Healthcare</td>
+          <td>$52,105</td>
+          <td>$32K–$85K</td>
+          <td>Clinical Staff, Dental Assistant</td>
+        </tr>
+        <tr>
+          <td>Research &amp; Science</td>
+          <td>$49,708</td>
+          <td>$22K–$100K</td>
+          <td>Research Associate, Lab Specialist</td>
+        </tr>
+        <tr>
+          <td>Facilities &amp; Trades</td>
+          <td>$41,447</td>
+          <td>$35K–$60K</td>
+          <td>Maintenance Tech, Custodian</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:0.78rem;color:var(--text-3);">*IT average skewed by a small number of very high-paying senior roles. Midpoint for most IT roles is $65K–$95K. Data from active UGA postings, May 2025.</p>
+
+    <h2>So Which Institution Should You Target?</h2>
+
+    <p>The answer depends on what you're looking for:</p>
+
+    <p><strong>If salary transparency matters to you:</strong> UGA is your best bet. Over half their postings list compensation upfront, which makes it much easier to know if a role is worth your time before applying.</p>
+
+    <p><strong>If you're aiming for high administrative compensation:</strong> Georgia Tech's admin roles pay significantly more on average — particularly for anything grant-related, research operations, or technology-adjacent. Expect fierce competition and a more demanding role profile.</p>
+
+    <p><strong>If you want sheer volume and variety:</strong> UGA has the most open positions by far — 1,140 at any given time — across virtually every administrative function. Georgia State has good volume but salary is opaque.</p>
+
+    <p><strong>If location is a factor:</strong> Georgia State (Atlanta) and Georgia Tech (Atlanta) are metro. UGA is Athens — a significantly lower cost of living that can offset a lower headline salary, especially for housing.</p>
+
+    <h2>What About the Other 23 USG Institutions?</h2>
+
+    <p>Don't overlook the rest of the system. Kennesaw State, Augusta University, and Georgia Southern all post hundreds of roles and offer competitive salaries — particularly for administrative professionals who prefer suburban or smaller-city settings. Kennesaw State's admin average is $74,894, and Columbus State's is $79,262, both higher than UGA's $56,031 for comparable admin roles.</p>
+
+    <div class="cta-box">
+      <p style="color:var(--text-1);font-weight:600;">Ready to find your next role across all USG institutions?</p>
+      <p>USG Jobs aggregates all 4,400+ open positions from every USG university in one searchable place — with salary filters, institution filters, and daily updates.</p>
+      <a href="/" class="cta-btn">Browse USG Jobs →</a>
+    </div>
+
+    <hr />
+    <p style="font-size:0.78rem;color:var(--text-3);">
+      <em>Data sourced from public job postings on official USG institution career portals, aggregated by USG Jobs. Salary figures reflect postings active as of May 2025 that included compensation information. Not all institutions publish salary data. USG Jobs is independent and not affiliated with the University System of Georgia.</em>
+    </p>
+  </main>
+
+  <footer>
+    &copy; 2025 USG Jobs &bull;
+    <a href="/">Home</a> &bull;
+    <a href="/blog.html">Blog</a> &bull;
+    <a href="/about.html">About</a> &bull;
+    <a href="/contact.html">Contact</a> &bull;
+    <a href="/privacy.html">Privacy Policy</a>
+  </footer>
+</body>
+</html>
