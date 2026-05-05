@@ -3,11 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>USG Job Listings</title>
+  <title>USG Jobs — Search All 26 University System of Georgia Job Listings</title>
+  <meta name="description" content="Search 4,000+ open positions across all 26 University System of Georgia institutions — UGA, Georgia Tech, Georgia State, and more — in one place. Filter by institution, salary, location, and job type. Updated daily." />
+  <meta property="og:title" content="USG Jobs — University System of Georgia Job Board" />
+  <meta property="og:description" content="Search 4,000+ open positions across all 26 USG institutions in one place. Updated daily." />
+  <meta property="og:url" content="https://usgjobs.org/" />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" href="jobs.json" as="fetch" crossorigin />
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7673140022942951" crossorigin="anonymous"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ── Design tokens (Dashboard / Data-forward) ── */
@@ -38,6 +45,10 @@
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .opacity-25 { opacity: 0.25; }
+    .opacity-75 { opacity: 0.75; }
 
     /* ── Row layout ── */
     .card-expand { max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0,1,0,1); }
@@ -739,7 +750,7 @@
   </style>
 </head>
 
-<body style="background:var(--bg);" class="min-h-screen">
+<body style="background:var(--bg);min-height:100vh;">
 
 <!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <header style="background:var(--header-bg);">
@@ -793,7 +804,7 @@
 </div>
 
 <!-- ── Filter bar (sticky) ──────────────────────────────────────────────────── -->
-<div id="filter-bar" class="sticky top-0 z-20">
+<div id="filter-bar" style="position:sticky;top:0;z-index:20;">
   <div style="max-width:1400px;margin:0 auto;padding:8px 14px;">
     <div class="filter-row">
       <!-- Row 1: Search + result count -->
@@ -949,7 +960,7 @@
     </div>
     <!-- Analyzing state -->
     <div id="cv-analyzing" class="hidden" style="text-align:center;padding:20px 0;color:var(--accent);font-weight:500;font-size:0.85rem;">
-      <svg class="animate-spin inline w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin" style="display:inline;width:20px;height:20px;margin-right:8px;vertical-align:middle;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
       </svg>
@@ -1065,6 +1076,7 @@
 <footer style="max-width:1100px;margin:0 auto;padding:12px 20px 24px;text-align:center;font-size:0.72rem;color:var(--text-3);">
   Data scraped from USG institution portals &bull; Refreshed daily &bull;
   Always verify on the <a style="color:var(--text-2);" href="https://careers.hprod.onehcm.usg.edu" target="_blank">official USG careers portal</a>
+  &bull; <a style="color:var(--text-2);" href="blog.html">Blog</a>
   &bull; <a style="color:var(--text-2);" href="about.html">About</a>
   &bull; <a style="color:var(--text-2);" href="contact.html">Contact</a>
   &bull; <a style="color:var(--text-2);" href="terms.html" target="_blank">Terms of Service</a>
